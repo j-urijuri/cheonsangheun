@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == "6sT3J0gEATNU1qTKbfjWPFVEWXC3";
+    }
+
+    // 현재 STORY / CHARACTER / ARCHIVE는 모두 비공개 준비 단계입니다.
+    // 공개 전까지는 공용 관리자 계정만 모든 문서를 읽고/쓸 수 있습니다.
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
