@@ -3444,6 +3444,11 @@ body.cms-editing .pair-profile-edit-btn{display:block}
 @media(max-width:1180px){.vn-studio-workbench{grid-template-columns:220px minmax(360px,1fr)}.vn-studio-inspector{grid-column:1/-1;min-height:440px}}
 @media(max-width:760px){#vnEpisodeShade{padding:0!important}.vn-studio-workbench{display:block}.vn-studio-scenes{max-height:220px;margin-bottom:10px}.vn-studio-preview{margin-bottom:10px}.vn-studio-inspector{min-height:520px}.vn-studio-preview-foot{flex-direction:column}.vn-edit-standing{width:50%;height:82%}}
 
+
+/* v65.1 · 이야기 클릭 이동 안정화 */
+.vn-episode-card{width:100%;font:inherit;color:inherit;text-align:left;border-radius:0}
+.vn-stage-bg,.vn-dialogue{cursor:pointer}
+.vn-story-folder,.vn-episode-card{touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -4747,7 +4752,7 @@ if (window.dat && dat.GUI) {
 (()=>{
   const useFirebase=window.CHEONSANGHEUN_USE_FIREBASE===true;
   const sc=document.createElement('script');
-  sc.src=useFirebase?'./cms.js?v=65.0.0':'./demo.js?v=64.0';
+  sc.src=useFirebase?'./cms.js?v=65.1':'./demo.js?v=64.0';
   if(useFirebase) sc.type='module';
   document.body.appendChild(sc);
 })();

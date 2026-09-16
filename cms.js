@@ -188,16 +188,26 @@ function renderStory(){
     activeEpisodeId=null;renderScene();return;
   }
   if(!activeEpisodeId||!eps.some(e=>e.id===activeEpisodeId))activeEpisodeId=eps[0].id;
-  list.innerHTML=eps.map(e=>`<article class="vn-episode-card ${e.id===activeEpisodeId?'is-active':''}" data-episode-id="${e.id}">
+  list.innerHTML=eps.map(e=>`<button type="button" class="vn-episode-card ${e.id===activeEpisodeId?'is-active':''}" data-episode-id="${e.id}">
     <small>${esc(e.subtitle||'회차')}</small><b>${esc(e.title||'(제목 없음)')}</b><p>${esc(e.excerpt||'')}</p>
-  </article>`).join('');
-  $$('[data-episode-id]').forEach(el=>el.onclick=()=>{activeEpisodeId=el.dataset.episodeId;activeSceneIndex=0;logRows=[];renderStory();});
+  </button>`).join('');
   renderScene();
 }
-$$('[data-story-folder]').forEach(btn=>btn.addEventListener('click',()=>{
+
+// 이야기 분류와 회차 선택은 목록이 다시 그려져도 끊기지 않도록 위임 방식으로 처리한다.
+$('#vnStoryFolders')?.addEventListener('click',e=>{
+  const btn=e.target.closest('[data-story-folder]');
+  if(!btn)return;
+  e.preventDefault();
   activeStoryFolder=btn.dataset.storyFolder==='character'?'character':'main';
-  activeEpisodeId=null;activeSceneIndex=0;logRows=[];renderStory();
-}));
+  activeEpisodeId=null;activeSceneIndex=0;logRows=[];stopAuto();renderStory();
+});
+$('#vnEpisodeList')?.addEventListener('click',e=>{
+  const card=e.target.closest('[data-episode-id]');
+  if(!card)return;
+  e.preventDefault();
+  activeEpisodeId=card.dataset.episodeId;activeSceneIndex=0;logRows=[];stopAuto();renderStory();
+});
 function currentEpisode(){return episodes().find(e=>e.id===activeEpisodeId)}
 function safeImg(el,src){
   if(!el)return;
@@ -237,9 +247,18 @@ function renderLog(){
   p.innerHTML=logRows.map(r=>`<div class="vn-log-row">${r.speaker?`<b>${esc(r.speaker)}</b>`:''}${esc(r.text)}</div>`).join('')||'<div class="vn-log-row">아직 기록된 대사가 없습니다.</div>';
 }
 function stopAuto(){if(autoTimer){clearInterval(autoTimer);autoTimer=null}$('#vnAuto')?.classList.remove('is-active')}
-$('#vnNext')?.addEventListener('click',nextScene);$('#vnBack')?.addEventListener('click',prevScene);
-$('#vnStageBg')?.addEventListener('click',e=>{if(e.target.closest('button'))return;if(!$('#vnLogPanel').hidden)return;nextScene()});
-$('#vnLog')?.addEventListener('click',()=>{$('#vnLogPanel').hidden=!$('#vnLogPanel').hidden});
+$('#vnNext')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();nextScene()});
+$('#vnBack')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();prevScene()});
+function advanceStoryByClick(e){
+  // 아래 조작 버튼이나 기록창을 누른 경우에는 장면을 넘기지 않는다.
+  if(e.target.closest('button,.vn-controls,.vn-log-panel,.vn-chapter-drawer'))return;
+  const log=$('#vnLogPanel');
+  if(log && !log.hidden)return;
+  nextScene();
+}
+$('#vnStageBg')?.addEventListener('click',advanceStoryByClick);
+$('#vnDialogue')?.addEventListener('click',advanceStoryByClick);
+$('#vnLog')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();$('#vnLogPanel').hidden=!$('#vnLogPanel').hidden});
 $('#vnMenu')?.addEventListener('click',()=>{$('.vn-chapter-drawer')?.scrollIntoView({behavior:'smooth',block:'nearest'})});
 $('#vnAuto')?.addEventListener('click',()=>{if(autoTimer){stopAuto();return}$('#vnAuto').classList.add('is-active');autoTimer=setInterval(nextScene,4200)});
 $('#vnSound')?.addEventListener('click',toggleVnSound);updateVnSoundButton();
