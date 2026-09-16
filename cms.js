@@ -127,6 +127,7 @@ function unlockArchive(id){
 }
 function isArchiveUnlocked(p){return isEditorMode()||p.unlockMode!=='story'||unlockedSet().has(p.id)}
 
+function pageIsPublic(key){return (pageCache[key]?.status||defaults[key]?.status)==='public'}
 function applyPage(key){
   const root=$(`[data-cms-section="${key}"]`),data=pageCache[key]||defaults[key];
   if(root){
@@ -139,20 +140,25 @@ function applyPage(key){
     lock.querySelector('h2').textContent=data.title||defaults[key].title;
     lock.querySelector('p').textContent=data.lockedMessage||defaults[key].lockedMessage;
   }
-  if(isEditorMode() || DEMO){if(cms)cms.style.display=key==='character'?'block':'flex';if(lock)lock.style.display='none'}
-  else{if(cms)cms.style.display='none';if(lock)lock.style.display='grid'}
+  // 일반 주소에서는 관리자 로그인 여부가 아니라 '페이지 상태'만 따른다.
+  // 편집 모드(?edit=1)에서는 잠긴 페이지도 관리자가 확인할 수 있다.
+  const open=isEditorMode()||DEMO||pageIsPublic(key);
+  if(cms)cms.style.display=open?(key==='character'?'block':'flex'):'none';
+  if(lock)lock.style.display=open?'none':'grid';
+  const railBtn=document.querySelector(`.rail [data-target="${key}"]`);
+  if(railBtn){
+    railBtn.dataset.locked=open?'false':'true';
+    const icon=railBtn.querySelector('.rail-lock');if(icon)icon.style.display=open?'none':'';
+  }
 }
 
 async function loadPages(){
   if(DEMO||!configured){pageCache={...demoPages};['story','character','archive'].forEach(applyPage);return}
-  if(!isEditorMode()){
-    pageCache={story:{...defaults.story},character:{...defaults.character},archive:{...defaults.archive}};
-    ['story','character','archive'].forEach(applyPage);
-    return;
-  }
+  // pages 문서는 공개/잠금 상태를 판단하는 설정값이므로 일반 방문자도 읽는다.
+  // 실제 비공개 내용은 아래 loadContent / Firestore rules에서 별도로 차단한다.
   for(const key of ['story','character','archive']){
     let data={...defaults[key]};
-    try{const s=await getDoc(doc(db,'pages',key));if(s.exists())data={...data,...s.data()}}catch(e){}
+    try{const s=await getDoc(doc(db,'pages',key));if(s.exists())data={...data,...s.data()}}catch(e){console.warn('page settings load failed',key,e)}
     pageCache[key]=data; applyPage(key);
   }
 }
@@ -161,14 +167,21 @@ async function loadContent(){
   else if(isEditorMode()){
     const s=await getDocs(collection(db,'content')); cache=s.docs.map(d=>({id:d.id,...d.data()}))
   }else{
-    // 현재 STORY / CHARACTER / ARCHIVE는 잠금 상태다.
-    // 관리자 세션이 브라우저에 남아 있어도 ?edit=1 편집 모드가 아니면 비공개 데이터를 불러오지 않는다.
-    cache=[]
+    // 일반 주소에서는 공개로 전환된 페이지의 '공개 문서'만 읽는다.
+    // 잠긴 페이지 또는 비공개 문서는 Firestore 규칙에서도 거부된다.
+    cache=[];
+    for(const key of ['story','character','archive']){
+      if(!pageIsPublic(key))continue;
+      try{
+        const s=await getDocs(query(collection(db,'content'),where('section','==',key),where('status','==','public')));
+        cache.push(...s.docs.map(d=>({id:d.id,...d.data()})));
+      }catch(e){console.warn('public content load failed',key,e)}
+    }
   }
   cache.sort((a,b)=>((a.sortOrder??999999)-(b.sortOrder??999999))||((b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0)));
   renderStory();renderCharacter();renderArchive();
 }
-function visibleFor(key){return cache.filter(p=>p.section===key&&(isEditorMode()||DEMO))}
+function visibleFor(key){return cache.filter(p=>p.section===key&&(isEditorMode()||DEMO||(pageIsPublic(key)&&p.status==='public')))}
 
 /* ---------- VISUAL NOVEL ---------- */
 function storyFolderOf(e){return e?.storyFolder==='character'?'character':'main'}
@@ -291,7 +304,9 @@ function refreshPairCards(){
 }
 async function loadCharacterPairs(){
  refreshPairCards();
- if(DEMO||!configured||!isEditorMode()||!db)return;
+ if(DEMO||!configured||!db)return;
+ // 인물 페이지가 공개일 때만 일반 방문자가 인물 데이터를 읽는다.
+ if(!isEditorMode()&&!pageIsPublic('character'))return;
  try{
    const snap=await getDocs(collection(db,'characterPairs'));
    const pairs=pairMap();
