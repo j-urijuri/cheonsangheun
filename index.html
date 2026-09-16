@@ -3300,7 +3300,7 @@ body.cms-editing .pair-profile-edit-btn{display:block}
 .pair-editor-card-preview{min-height:150px;margin-top:9px;background-size:cover;background-position:center}
 @media(max-width:760px){.r2-field-row{grid-template-columns:1fr 1fr}.r2-field-row input{grid-column:1/-1}}
 
-/* v63.5 · pair profile inline editor + readable long text */
+/* v63.6 · restore side detail tabs + inline editor + hidden-scroll details */
 .pair-dialog{position:relative!important}
 .character-brief{max-width:min(38vw,560px)!important;min-width:0!important}
 .character-brief blockquote,
@@ -3316,7 +3316,16 @@ body.cms-editing .pair-profile-edit-btn{display:block}
 }
 .character-brief blockquote{line-height:1.55!important}
 .character-brief small{display:block!important;line-height:1.7!important}
-.profile-sheet{overflow:hidden!important}
+.profile-sheet{
+  overflow:visible!important;
+  z-index:120!important;
+}
+.profile-edge-tab{
+  z-index:122!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
 .profile-sheet-body{
   box-sizing:border-box!important;
   height:100%!important;
@@ -4655,7 +4664,7 @@ if (window.dat && dat.GUI) {
 (()=>{
   const useFirebase=window.CHEONSANGHEUN_USE_FIREBASE===true;
   const sc=document.createElement('script');
-  sc.src=useFirebase?'./cms.js?v=63.5':'./demo.js?v=63.5';
+  sc.src=useFirebase?'./cms.js?v=63.6':'./demo.js?v=63.6';
   if(useFirebase) sc.type='module';
   document.body.appendChild(sc);
 })();
