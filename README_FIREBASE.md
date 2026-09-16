@@ -145,3 +145,10 @@ Cloudflare 설정용 파일은 GitHub Pages에서 실행되는 파일이 아닙�
 - 일반 `index.html` 접속은 관리자 로그인 세션이 남아 있어도 STORY / CHARACTER / ARCHIVE를 잠금 상태로 표시합니다.
 - `admin.html`에서 `편집 모드로 입장`하여 `index.html?edit=1`로 들어온 경우에만 비공개 Firestore 데이터를 불러옵니다.
 - Firestore 규칙 자체도 관리자 UID만 read/write 가능 상태를 유지합니다.
+
+
+## v65 이야기 분류
+- 이야기 화면은 `본편`과 `인물 이야기` 두 분류로 나뉩니다.
+- 기존 이야기 문서는 `storyFolder` 값이 없어도 자동으로 `본편`으로 표시됩니다.
+- 관리자 편집에서 회차마다 분류를 선택할 수 있습니다.
+- 자동 생성되는 기록의 다시보기에도 출처 분류가 함께 저장됩니다.

@@ -21,6 +21,7 @@ const label=s=>s==='story'?'이야기':s==='character'?'인물':'기록';
 let admin=false,currentUser=null,db=null,auth=null;
 let cache=[], pageCache={}, activeSection='story';
 let activeEpisodeId=null, activeSceneIndex=0, autoTimer=null, logRows=[];
+let activeStoryFolder='main';
 let editingScenes=[], editingEpisodeId=null, editingSceneIndex=-1;
 let episodeDirty=false, sceneFormDirty=false, sceneEditorMounted=false, scenePreviewLocalUrl='';
 const vnEditorAudio=new Audio(); vnEditorAudio.volume=.65; let vnEditorAudioButton=null;
@@ -90,7 +91,7 @@ function applyVnSound(ep,scene){
   if(scene.ambAction==='set')setTrack(vnAudio,'amb',scene.ambUrl||'');else if(scene.ambAction==='stop')setTrack(vnAudio,'amb','');
   if(scene.seUrl&&!vnAudio.muted){vnAudio.se.pause();vnAudio.se.src=scene.seUrl;vnAudio.se.currentTime=0;playAudio(vnAudio.se,false)}
 }
-function updateVnSoundButton(){const b=$('#vnSound');if(!b)return;b.textContent=vnAudio.muted?'SOUND OFF':'SOUND ON';b.classList.toggle('is-active',!vnAudio.muted)}
+function updateVnSoundButton(){const b=$('#vnSound');if(!b)return;b.textContent=vnAudio.muted?'소리 끔':'소리 켬';b.classList.toggle('is-active',!vnAudio.muted)}
 function toggleVnSound(){vnAudio.muted=!vnAudio.muted;if(vnAudio.muted){vnAudio.bgm.pause();vnAudio.amb.pause();vnAudio.se.pause()}else{playAudio(vnAudio.bgm,false);playAudio(vnAudio.amb,false)}updateVnSoundButton()}
 
 const demoContent=[
@@ -103,7 +104,7 @@ const demoContent=[
  {id:'ep-02',section:'story',status:'public',sortOrder:2,subtitle:'第二章',title:'끊어진 길',excerpt:'아직 작성 중인 다음 장.',bgmUrl:'',scenes:[
    {kind:'narration',speaker:'',text:'다음 장면을 이곳에 이어서 작성할 수 있습니다.',background:'',leftImage:'',rightImage:'',cgImage:'',effect:'fade',archiveId:'',bgmAction:'keep',bgmUrl:'',ambAction:'keep',ambUrl:'',seUrl:'',soundNote:''}
  ]},
- {id:'arc-01',section:'archive',status:'public',sortOrder:1,subtitle:'STORY',dateLabel:'記錄 001',title:'선계 정원에서의 조우',excerpt:'첫 번째 이야기를 지나면 열리는 기록.',body:'비가 그친 선계의 정원에서 두 존재가 처음 마주쳤다.\n\n이 기록은 당시 장면을 그대로 다시 볼 수 있는 예시이다.',imageUrl:'',unlockMode:'story',replayEpisode:'第一章 · 비가 그친 자리',replayScenes:[
+ {id:'arc-01',section:'archive',status:'public',sortOrder:1,subtitle:'이야기',dateLabel:'記錄 001',title:'선계 정원에서의 조우',excerpt:'첫 번째 이야기를 지나면 열리는 기록.',body:'비가 그친 선계의 정원에서 두 존재가 처음 마주쳤다.\n\n이 기록은 당시 장면을 그대로 다시 볼 수 있는 예시이다.',imageUrl:'',unlockMode:'story',replayEpisode:'第一章 · 비가 그친 자리',replayScenes:[
    {kind:'dialogue',speaker:'백연',text:'“이곳까지 따라올 줄은 몰랐군.”',background:'',leftImage:'',rightImage:'',cgImage:'',effect:'fade',archiveId:'arc-01',bgmAction:'keep',bgmUrl:'',ambAction:'keep',ambUrl:'',seUrl:'',soundNote:''}
  ]},
  {id:'arc-02',section:'archive',status:'public',sortOrder:2,subtitle:'WORLD',dateLabel:'記錄 002',title:'삼계에 관한 공개 기록',excerpt:'처음부터 열려 있는 일반 기록의 예시.',body:'아카이브에는 스토리 해금 기록뿐 아니라 운영진이 직접 작성한 세계관 문서나 공지도 함께 넣을 수 있다.',imageUrl:'',unlockMode:'always'},
@@ -170,22 +171,33 @@ async function loadContent(){
 function visibleFor(key){return cache.filter(p=>p.section===key&&(isEditorMode()||DEMO))}
 
 /* ---------- VISUAL NOVEL ---------- */
-function episodes(){return visibleFor('story')}
+function storyFolderOf(e){return e?.storyFolder==='character'?'character':'main'}
+function storyFolderLabel(v){return v==='character'?'인물 이야기':'본편'}
+function allEpisodes(){return visibleFor('story')}
+function episodes(){return allEpisodes().filter(e=>storyFolderOf(e)===activeStoryFolder)}
 function renderStory(){
   const root=$('[data-cms-section="story"]'); if(!root)return;
-  const list=$('#vnEpisodeList'),status=root.querySelector('[data-cms-status]'),eps=episodes();
-  status.textContent=isEditorMode()?`${eps.length}개 에피소드 · 실제 페이지에서 장면을 바로 편집할 수 있습니다.`:'';
+  const list=$('#vnEpisodeList'),status=root.querySelector('[data-cms-status]'),all=allEpisodes(),eps=episodes();
+  const mainCount=all.filter(e=>storyFolderOf(e)==='main').length,charCount=all.filter(e=>storyFolderOf(e)==='character').length;
+  if($('#vnMainStoryCount'))$('#vnMainStoryCount').textContent=`${mainCount}개 회차`;
+  if($('#vnCharacterStoryCount'))$('#vnCharacterStoryCount').textContent=`${charCount}개 회차`;
+  $$('[data-story-folder]').forEach(b=>b.classList.toggle('is-active',b.dataset.storyFolder===activeStoryFolder));
+  status.textContent=isEditorMode()?`${storyFolderLabel(activeStoryFolder)} · ${eps.length}개 회차`:'';
   if(!eps.length){
-    list.innerHTML='<div class="cms-empty">아직 공개된 이야기가 없습니다.</div>';
+    list.innerHTML=`<div class="cms-empty">${storyFolderLabel(activeStoryFolder)}에 아직 저장된 회차가 없습니다.</div>`;
     activeEpisodeId=null;renderScene();return;
   }
   if(!activeEpisodeId||!eps.some(e=>e.id===activeEpisodeId))activeEpisodeId=eps[0].id;
   list.innerHTML=eps.map(e=>`<article class="vn-episode-card ${e.id===activeEpisodeId?'is-active':''}" data-episode-id="${e.id}">
-    <small>${esc(e.subtitle||'CHAPTER')}</small><b>${esc(e.title||'(제목 없음)')}</b><p>${esc(e.excerpt||'')}</p>
+    <small>${esc(e.subtitle||'회차')}</small><b>${esc(e.title||'(제목 없음)')}</b><p>${esc(e.excerpt||'')}</p>
   </article>`).join('');
   $$('[data-episode-id]').forEach(el=>el.onclick=()=>{activeEpisodeId=el.dataset.episodeId;activeSceneIndex=0;logRows=[];renderStory();});
   renderScene();
 }
+$$('[data-story-folder]').forEach(btn=>btn.addEventListener('click',()=>{
+  activeStoryFolder=btn.dataset.storyFolder==='character'?'character':'main';
+  activeEpisodeId=null;activeSceneIndex=0;logRows=[];renderStory();
+}));
 function currentEpisode(){return episodes().find(e=>e.id===activeEpisodeId)}
 function safeImg(el,src){
   if(!el)return;
@@ -193,12 +205,12 @@ function safeImg(el,src){
 }
 function renderScene(){
   const ep=currentEpisode(),empty=$('#vnEmptyArt');
-  if(!ep){$('#vnChapterLabel').textContent='STORY';$('#vnSceneCount').textContent='—';$('#vnSpeaker').textContent='';$('#vnText').textContent='에피소드를 선택하면 이야기가 시작됩니다.';return}
+  if(!ep){$('#vnChapterLabel').textContent='이야기';$('#vnSceneCount').textContent='—';$('#vnSpeaker').textContent='';$('#vnText').textContent='회차를 선택하면 이야기가 시작됩니다.';return}
   const scenes=Array.isArray(ep.scenes)?ep.scenes:[];
-  if(!scenes.length){activeSceneIndex=0;$('#vnChapterLabel').textContent=ep.subtitle||'STORY';$('#vnSceneCount').textContent='00 / 00';$('#vnSpeaker').textContent='';$('#vnText').textContent='아직 장면이 없습니다.';safeImg($('#vnLeftChar'),'');safeImg($('#vnRightChar'),'');safeImg($('#vnCg'),'');$('#vnStageBg').style.backgroundImage='';return}
+  if(!scenes.length){activeSceneIndex=0;$('#vnChapterLabel').textContent=ep.subtitle||'이야기';$('#vnSceneCount').textContent='00 / 00';$('#vnSpeaker').textContent='';$('#vnText').textContent='아직 장면이 없습니다.';safeImg($('#vnLeftChar'),'');safeImg($('#vnRightChar'),'');safeImg($('#vnCg'),'');$('#vnStageBg').style.backgroundImage='';return}
   activeSceneIndex=Math.max(0,Math.min(activeSceneIndex,scenes.length-1));
   const s=scenes[activeSceneIndex]||{};
-  $('#vnChapterLabel').textContent=ep.subtitle||ep.title||'STORY';
+  $('#vnChapterLabel').textContent=ep.subtitle||ep.title||'이야기';
   $('#vnSceneCount').textContent=`${String(activeSceneIndex+1).padStart(2,'0')} / ${String(scenes.length).padStart(2,'0')}`;
   $('#vnProgress').textContent=`${ep.title||''} · ${activeSceneIndex+1}/${scenes.length}`;
   $('#vnSpeaker').textContent=s.speaker||'';
@@ -307,7 +319,7 @@ function renderArchive(){
  if(!currentArchiveId||!posts.some(p=>p.id===currentArchiveId&&isArchiveUnlocked(p)))currentArchiveId=posts.find(isArchiveUnlocked)?.id||null;
  list.innerHTML=posts.map(p=>{const unlocked=isArchiveUnlocked(p);return `<article class="archive-record-card ${unlocked?'':'locked'} ${p.id===currentArchiveId?'is-active':''}" data-archive-id="${p.id}">
    <div class="archive-record-thumb" ${unlocked&&p.imageUrl?`style="background-image:url('${p.imageUrl}')"`:''}>${unlocked?'錄':'鎖'}</div>
-   <div><small>${esc(p.dateLabel||p.subtitle||'RECORD')}</small><b>${unlocked?esc(p.title||'(제목 없음)'):'未解放 · 잠긴 기록'}</b><p>${unlocked?esc(p.excerpt||''):'이야기를 진행하면 열립니다.'}</p></div>
+   <div><small>${esc(p.dateLabel||p.subtitle||'기록')}</small><b>${unlocked?esc(p.title||'(제목 없음)'):'未解放 · 잠긴 기록'}</b><p>${unlocked?esc(p.excerpt||''):'이야기를 진행하면 열립니다.'}</p></div>
  </article>`}).join('');
  list.querySelectorAll('[data-archive-id]').forEach(el=>el.onclick=()=>{
    const p=posts.find(x=>x.id===el.dataset.archiveId);if(!p)return;
@@ -319,7 +331,7 @@ function renderArchive(){
  $('#archiveCmsDetail').querySelector('[data-archive-replay]')?.addEventListener('click',e=>openArchiveReplay(e.currentTarget.dataset.archiveReplay));
 }
 function archiveEmpty(){return `<div class="archive-detail-empty"><span>錄</span><h3>기록을 선택해 주세요.</h3><p>스토리를 진행하며 해금된 기록과 공개된 문서가 이곳에 펼쳐집니다.</p></div>`}
-function archiveDetail(p){const replay=Array.isArray(p.replayScenes)&&p.replayScenes.length;return `<div class="archive-detail"><div class="archive-detail-head"><small>${esc(p.dateLabel||p.subtitle||'RECORD')}</small><h3>${esc(p.title||'')}</h3></div>${p.imageUrl?`<img class="archive-detail-image" src="${esc(p.imageUrl)}" alt="">`:''}<div class="archive-detail-body">${esc(p.body||p.excerpt||'')}</div>${replay?`<button class="archive-replay-btn" data-archive-replay="${p.id}">다시 보기 · 再見</button><div class="archive-replay-meta">${esc(p.replayEpisode||'STORY RECORD')} · ${p.replayScenes.length} SCENES</div>`:''}<div class="archive-related">${p.unlockMode==='story'?'STORY UNLOCK RECORD':'OPEN RECORD'}${p.editorName?' · '+esc(p.editorName):''}</div></div>`}
+function archiveDetail(p){const replay=Array.isArray(p.replayScenes)&&p.replayScenes.length;return `<div class="archive-detail"><div class="archive-detail-head"><small>${esc(p.dateLabel||p.subtitle||'기록')}</small><h3>${esc(p.title||'')}</h3></div>${p.imageUrl?`<img class="archive-detail-image" src="${esc(p.imageUrl)}" alt="">`:''}<div class="archive-detail-body">${esc(p.body||p.excerpt||'')}</div>${replay?`<button class="archive-replay-btn" data-archive-replay="${p.id}">다시 보기 · 再見</button><div class="archive-replay-meta">${esc(p.replayEpisode||'이야기 기록')} · ${p.replayScenes.length} SCENES</div>`:''}<div class="archive-related">${p.unlockMode==='story'?'이야기 진행 기록':'공개 기록'}${p.editorName?' · '+esc(p.editorName):''}</div></div>`}
 
 
 /* ---------- ARCHIVE REPLAY ---------- */
@@ -439,7 +451,7 @@ function attachVnStudioInputEvents(){
  $('#vnSceneFile')?.addEventListener('change',e=>previewFile(e.target.files?.[0],url=>{scenePreviewLocalUrl=url;setSceneFormDirty(true)}));
 }
 function addVnAudioPreviewButtons(){
- const defs=[['vnEpisodeBgm','BGM'],['vnSceneBgm','BGM'],['vnSceneAmb','환경음'],['vnSceneSe','SE']];
+ const defs=[['vnEpisodeBgm','배경음악'],['vnSceneBgm','배경음악'],['vnSceneAmb','환경음'],['vnSceneSe','효과음']];
  defs.forEach(([id,label])=>{const input=$('#'+id);if(!input||input.parentElement?.querySelector(`[data-vn-audio-for="${id}"]`))return;const b=document.createElement('button');b.type='button';b.className='vn-audio-preview-btn';b.dataset.vnAudioFor=id;b.textContent=`▶ ${label}`;input.parentElement?.appendChild(b);b.addEventListener('click',()=>previewVnAudio(id,b))})
 }
 async function previewVnAudio(id,button){
@@ -451,11 +463,11 @@ async function previewVnAudio(id,button){
 vnEditorAudio.addEventListener('ended',()=>{if(vnEditorAudioButton){vnEditorAudioButton.classList.remove('is-playing');vnEditorAudioButton.textContent='▶ 미리듣기';vnEditorAudioButton=null}});
 function resetStudioSelection(){editingSceneIndex=-1;sceneFormDirty=false;scenePreviewLocalUrl='';$('#vnSceneInlineMount .vn-scene-paper')?.classList.remove('is-active');$('#vnSceneInspectorEmpty')?.removeAttribute('hidden');$('#vnStudioPreviewTitle').textContent='장면을 선택해 주세요';renderEditorScenePreview(null)}
 function newEpisode(){
- mountSceneEditorInline();editingEpisodeId=null;editingScenes=[];$('#vnEpisodeId').value='';$('#vnEpisodeVisibility').value='private';$('#vnEpisodeChapter').value='';$('#vnEpisodeOrder').value='';$('#vnEpisodeTitle').value='';$('#vnEpisodeExcerpt').value='';$('#vnEpisodeBgm').value='';$('#vnEpisodeHeading').textContent='새 에피소드';$('#vnDeleteEpisode').style.display='none';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);syncVnPreviewRatio();openShade('vnEpisodeShade');requestAnimationFrame(syncVnPreviewRatio)
+ mountSceneEditorInline();editingEpisodeId=null;editingScenes=[];$('#vnEpisodeId').value='';$('#vnEpisodeFolder').value=activeStoryFolder;$('#vnEpisodeVisibility').value='private';$('#vnEpisodeChapter').value='';$('#vnEpisodeOrder').value='';$('#vnEpisodeTitle').value='';$('#vnEpisodeExcerpt').value='';$('#vnEpisodeBgm').value='';$('#vnEpisodeHeading').textContent='새 회차';$('#vnDeleteEpisode').style.display='none';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);syncVnPreviewRatio();openShade('vnEpisodeShade');requestAnimationFrame(syncVnPreviewRatio)
 }
 function openEpisodeEditor(id=activeEpisodeId){
  mountSceneEditorInline();const ep=cache.find(x=>x.id===id&&x.section==='story');if(!ep)return;
- editingEpisodeId=ep.id;editingScenes=structuredClone(ep.scenes||[]);$('#vnEpisodeId').value=ep.id;$('#vnEpisodeVisibility').value=ep.status||'private';$('#vnEpisodeChapter').value=ep.subtitle||'';$('#vnEpisodeOrder').value=ep.sortOrder??'';$('#vnEpisodeTitle').value=ep.title||'';$('#vnEpisodeExcerpt').value=ep.excerpt||'';$('#vnEpisodeBgm').value=ep.bgmUrl||'';$('#vnEpisodeHeading').textContent=ep.title||'에피소드 편집';$('#vnDeleteEpisode').style.display='';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);syncVnPreviewRatio();openShade('vnEpisodeShade');requestAnimationFrame(syncVnPreviewRatio)
+ editingEpisodeId=ep.id;editingScenes=structuredClone(ep.scenes||[]);$('#vnEpisodeId').value=ep.id;$('#vnEpisodeFolder').value=storyFolderOf(ep);$('#vnEpisodeVisibility').value=ep.status||'private';$('#vnEpisodeChapter').value=ep.subtitle||'';$('#vnEpisodeOrder').value=ep.sortOrder??'';$('#vnEpisodeTitle').value=ep.title||'';$('#vnEpisodeExcerpt').value=ep.excerpt||'';$('#vnEpisodeBgm').value=ep.bgmUrl||'';$('#vnEpisodeHeading').textContent=ep.title||'회차 편집';$('#vnDeleteEpisode').style.display='';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);syncVnPreviewRatio();openShade('vnEpisodeShade');requestAnimationFrame(syncVnPreviewRatio)
 }
 function renderSceneEditorList(){
  const list=$('#vnSceneEditorList');if(!list)return;
@@ -514,10 +526,10 @@ async function syncEpisodeArchive(episodeId,payload,scenesForSave){
    replayScenes[0].bgmAction='set';replayScenes[0].bgmUrl=payload.bgmUrl;
  }
  const archivePayload={
-   section:'archive',status:payload.status,title:payload.title,subtitle:'STORY',
-   dateLabel:payload.subtitle||'STORY RECORD',excerpt:payload.excerpt||'',body:payload.excerpt||'',
+   section:'archive',status:payload.status,title:payload.title,subtitle:storyFolderLabel(payload.storyFolder),storyFolder:payload.storyFolder,
+   dateLabel:payload.subtitle||'이야기 기록',excerpt:payload.excerpt||'',body:payload.excerpt||'',
    sortOrder:payload.sortOrder,imageUrl:(replayScenes.find(x=>x.cgImage)?.cgImage||replayScenes.find(x=>x.background)?.background||''),
-   unlockMode:'story',replayEpisode:`${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,
+   unlockMode:'story',replayEpisode:`${storyFolderLabel(payload.storyFolder)} · ${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,
    replayEpisodeId:episodeId,replayScenes,sourceEpisodeId:episodeId,isAutoStoryArchive:true,
    editorName:payload.editorName||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()
  };
@@ -534,7 +546,7 @@ $('#vnSaveEpisode')?.addEventListener('click',async()=>{
    if(editingSceneIndex>=0)editingScenes[editingSceneIndex]=draft;else{editingScenes.push(draft);editingSceneIndex=editingScenes.length-1}
    sceneFormDirty=false;scenePreviewLocalUrl='';renderSceneEditorList();
  }
- const payload={section:'story',status:$('#vnEpisodeVisibility').value,title,subtitle:$('#vnEpisodeChapter').value.trim(),excerpt:$('#vnEpisodeExcerpt').value.trim(),bgmUrl:$('#vnEpisodeBgm').value.trim(),sortOrder:$('#vnEpisodeOrder').value===''?null:Number($('#vnEpisodeOrder').value),scenes:structuredClone(editingScenes),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
+ const payload={section:'story',storyFolder:$('#vnEpisodeFolder').value==='character'?'character':'main',status:$('#vnEpisodeVisibility').value,title,subtitle:$('#vnEpisodeChapter').value.trim(),excerpt:$('#vnEpisodeExcerpt').value.trim(),bgmUrl:$('#vnEpisodeBgm').value.trim(),sortOrder:$('#vnEpisodeOrder').value===''?null:Number($('#vnEpisodeOrder').value),scenes:structuredClone(editingScenes),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
  try{
    const wasNew=!editingEpisodeId;
    if(wasNew){payload.createdAt=serverTimestamp();const r=await addDoc(collection(db,'content'),payload);editingEpisodeId=r.id}
@@ -544,9 +556,9 @@ $('#vnSaveEpisode')?.addEventListener('click',async()=>{
    payload.scenes=scenesForSave;
    if(wasNew)await updateDoc(doc(db,'content',editingEpisodeId),{scenes:scenesForSave,updatedAt:serverTimestamp()});
    else await updateDoc(doc(db,'content',editingEpisodeId),payload);
-   activeEpisodeId=editingEpisodeId;
+   activeEpisodeId=editingEpisodeId;activeStoryFolder=payload.storyFolder;
 
-   // STORY 전체를 ARCHIVE의 '다시 보기' 기록으로 자동 저장/업데이트합니다.
+   // 이야기 전체를 ARCHIVE의 '다시 보기' 기록으로 자동 저장/업데이트합니다.
    await syncEpisodeArchive(editingEpisodeId,payload,scenesForSave);
 
    // 장면별로 별도 기록을 선택한 경우에는 기존 수동 연결도 그대로 유지합니다.
@@ -556,13 +568,13 @@ $('#vnSaveEpisode')?.addEventListener('click',async()=>{
    for(const archiveId of archiveIds){
      const replayScenes=editingScenes.filter(x=>x.archiveId===archiveId).map(x=>structuredClone(x));
      if(replayScenes.length&&payload.bgmUrl&&(replayScenes[0].bgmAction||'keep')==='keep'){replayScenes[0].bgmAction='set';replayScenes[0].bgmUrl=payload.bgmUrl}
-     try{await updateDoc(doc(db,'content',archiveId),{unlockMode:'story',replayEpisode:`${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,replayEpisodeId:editingEpisodeId,replayScenes,updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay sync failed',archiveId,err)}
+     try{await updateDoc(doc(db,'content',archiveId),{unlockMode:'story',replayEpisode:`${storyFolderLabel(payload.storyFolder)} · ${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,replayEpisodeId:editingEpisodeId,replayScenes,updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay sync failed',archiveId,err)}
    }
-   $('#vnEpisodeStatus').textContent='저장됨 · ARCHIVE에도 기록됨';episodeDirty=false;sceneFormDirty=false;setStudioDirty(false);await loadContent();closeShade('vnEpisodeShade')
+   $('#vnEpisodeStatus').textContent='저장됨 · 기록에도 함께 저장됨';episodeDirty=false;sceneFormDirty=false;setStudioDirty(false);await loadContent();closeShade('vnEpisodeShade')
  }catch(e){console.error(e);$('#vnEpisodeStatus').textContent='저장 실패'}
 });
 $('#vnDeleteEpisode')?.addEventListener('click',async()=>{
- if(!editingEpisodeId||!confirm('이 에피소드를 삭제할까요?'))return;
+ if(!editingEpisodeId||!confirm('이 회차를 삭제할까요?'))return;
  try{
    const episodeId=editingEpisodeId;
    await deleteDoc(doc(db,'content',episodeId));
