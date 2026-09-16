@@ -21,6 +21,9 @@ let admin=false,currentUser=null,db=null,auth=null;
 let cache=[], pageCache={}, activeSection='story';
 let activeEpisodeId=null, activeSceneIndex=0, autoTimer=null, logRows=[];
 let editingScenes=[], editingEpisodeId=null, editingSceneIndex=-1;
+let episodeDirty=false, sceneFormDirty=false, sceneEditorMounted=false, scenePreviewLocalUrl='';
+const vnEditorAudio=new Audio(); vnEditorAudio.volume=.65; let vnEditorAudioButton=null;
+
 let currentArchiveId=null;
 let archiveReplayScenes=[], archiveReplayIndex=0;
 let localPreviewDataUrl='';
@@ -367,44 +370,113 @@ function openShade(id){const el=$('#'+id);el?.classList.add('open');el?.setAttri
 function closeShade(id){const el=$('#'+id);el?.classList.remove('open');el?.setAttribute('aria-hidden','true')}
 $$('[data-cms-close="doc"]').forEach(b=>b.onclick=()=>closeShade('cmsDocShade'));
 $$('[data-cms-close="page"]').forEach(b=>b.onclick=()=>closeShade('cmsPageShade'));
-$$('[data-vn-close="episode"]').forEach(b=>b.onclick=()=>closeShade('vnEpisodeShade'));
-$$('[data-vn-close="scene"]').forEach(b=>b.onclick=()=>closeShade('vnSceneShade'));
-$$('.cms-editor-shade').forEach(sh=>sh.addEventListener('click',e=>{if(e.target===sh)closeShade(sh.id)}));
+function confirmEpisodeClose(){
+ if(episodeDirty&&!confirm('저장하지 않은 STORY 수정 내용이 있습니다. 닫을까요?'))return false;
+ episodeDirty=false;sceneFormDirty=false;return true;
+}
+function closeEpisodeEditor(){if(confirmEpisodeClose())closeShade('vnEpisodeShade')}
+$$('[data-vn-close="episode"]').forEach(b=>b.onclick=closeEpisodeEditor);
+$$('[data-vn-close="scene"]').forEach(b=>b.onclick=()=>{
+ if(sceneFormDirty&&!confirm('현재 장면에서 적용하지 않은 수정이 있습니다. 닫을까요?'))return;
+ sceneFormDirty=false;const p=$('#vnSceneInlineMount .vn-scene-paper');p?.classList.remove('is-active');$('#vnSceneInspectorEmpty')?.removeAttribute('hidden');
+});
+$$('.cms-editor-shade').forEach(sh=>sh.addEventListener('click',e=>{
+ if(e.target!==sh)return;
+ if(sh.id==='vnEpisodeShade'){closeEpisodeEditor();return}
+ if(sh.id==='vnSceneShade')return;
+ closeShade(sh.id)
+}));
 $$('[data-cms-new]').forEach(b=>b.onclick=()=>{const sec=b.closest('[data-cms-section]')?.dataset.cmsSection;if(sec==='character')return;resetDoc(sec)});
 $$('[data-cms-page-edit]').forEach(b=>b.onclick=()=>openPage(b.closest('[data-cms-section]').dataset.cmsSection));
 
-/* ---------- EPISODE / SCENE EDITOR ---------- */
-function newEpisode(){editingEpisodeId=null;editingScenes=[];$('#vnEpisodeId').value='';$('#vnEpisodeVisibility').value='private';$('#vnEpisodeChapter').value='';$('#vnEpisodeOrder').value='';$('#vnEpisodeTitle').value='';$('#vnEpisodeExcerpt').value='';$('#vnEpisodeBgm').value='';$('#vnEpisodeHeading').textContent='새 에피소드';$('#vnDeleteEpisode').style.display='none';renderSceneEditorList();openShade('vnEpisodeShade')}
+/* ---------- EPISODE / SCENE EDITOR · v64 STUDIO ---------- */
+function mountSceneEditorInline(){
+ if(sceneEditorMounted)return;
+ const mount=$('#vnSceneInlineMount'),shade=$('#vnSceneShade'),paper=shade?.querySelector('.vn-scene-paper');
+ if(!mount||!paper)return;
+ mount.appendChild(paper);paper.classList.remove('is-active');shade.remove();sceneEditorMounted=true;
+ attachVnStudioInputEvents();addVnAudioPreviewButtons();
+}
+function setStudioDirty(dirty=true){
+ episodeDirty=dirty||episodeDirty;
+ const el=$('#vnStudioDirty');if(el){el.textContent=episodeDirty?'UNSAVED':'SAVED';el.classList.toggle('is-dirty',episodeDirty)}
+}
+function setSceneFormDirty(dirty=true){sceneFormDirty=dirty;if(dirty)setStudioDirty(true);renderEditorScenePreview()}
+function sceneDraftFromForm(){
+ return {kind:$('#vnSceneKind')?.value||'dialogue',speaker:$('#vnSceneSpeaker')?.value.trim()||'',text:$('#vnSceneText')?.value||'',background:$('#vnSceneBackground')?.value.trim()||'',leftImage:$('#vnSceneLeft')?.value.trim()||'',rightImage:$('#vnSceneRight')?.value.trim()||'',cgImage:$('#vnSceneCg')?.value.trim()||'',effect:$('#vnSceneEffect')?.value||'fade',archiveId:$('#vnSceneArchive')?.value||'',bgmAction:$('#vnSceneBgmAction')?.value||'keep',bgmUrl:$('#vnSceneBgm')?.value.trim()||'',ambAction:$('#vnSceneAmbAction')?.value||'keep',ambUrl:$('#vnSceneAmb')?.value.trim()||'',seUrl:$('#vnSceneSe')?.value.trim()||'',soundNote:$('#vnSceneSoundNote')?.value.trim()||''};
+}
+function studioSafeImg(id,src){const el=$(id);if(!el)return;if(src){el.src=src;el.hidden=false}else{el.removeAttribute('src');el.hidden=true}}
+function renderEditorScenePreview(scene=null){
+ const s=scene||($('#vnSceneInlineMount .vn-scene-paper')?.classList.contains('is-active')?sceneDraftFromForm():null);
+ const empty=$('#vnEditEmpty'),dialogue=$('#vnEditDialogue');
+ if(!s){if(empty)empty.hidden=false;if(dialogue)dialogue.style.display='none';studioSafeImg('#vnEditLeft','');studioSafeImg('#vnEditRight','');studioSafeImg('#vnEditCg','');if($('#vnEditBg'))$('#vnEditBg').style.backgroundImage='';return}
+ if(empty)empty.hidden=true;if(dialogue)dialogue.style.display='block';
+ const bg=scenePreviewLocalUrl||s.background||'';if($('#vnEditBg'))$('#vnEditBg').style.backgroundImage=bg?`url("${bg.replace(/"/g,'%22')}")`:'';
+ studioSafeImg('#vnEditLeft',s.leftImage);studioSafeImg('#vnEditRight',s.rightImage);studioSafeImg('#vnEditCg',s.cgImage);
+ if($('#vnEditSpeaker')){$('#vnEditSpeaker').textContent=s.kind==='narration'?'':s.speaker||'';$('#vnEditSpeaker').style.display=(s.kind==='narration'||!s.speaker)?'none':'block'}
+ if($('#vnEditText'))$('#vnEditText').textContent=s.text||'장면에 표시될 문장을 입력해 주세요.';
+ const bits=[];if(s.cgImage)bits.push('CG');else{bits.push(s.background?'BACKGROUND':'NO BG');if(s.leftImage)bits.push('LEFT');if(s.rightImage)bits.push('RIGHT')}
+ if($('#vnStudioComposition'))$('#vnStudioComposition').textContent=bits.join(' + ');
+}
+function attachVnStudioInputEvents(){
+ const ids=['vnSceneKind','vnSceneSpeaker','vnSceneEffect','vnSceneText','vnSceneBackground','vnSceneLeft','vnSceneRight','vnSceneCg','vnSceneArchive','vnSceneBgmAction','vnSceneBgm','vnSceneSe','vnSceneAmbAction','vnSceneAmb','vnSceneSoundNote'];
+ ids.forEach(id=>{const el=$('#'+id);if(!el||el.dataset.studioBound)return;el.dataset.studioBound='1';el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>setSceneFormDirty(true))});
+ ['vnEpisodeVisibility','vnEpisodeChapter','vnEpisodeOrder','vnEpisodeTitle','vnEpisodeExcerpt','vnEpisodeBgm'].forEach(id=>{const el=$('#'+id);if(!el||el.dataset.studioBound)return;el.dataset.studioBound='1';el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>setStudioDirty(true))});
+ $('#vnSceneFile')?.addEventListener('change',e=>previewFile(e.target.files?.[0],url=>{scenePreviewLocalUrl=url;setSceneFormDirty(true)}));
+}
+function addVnAudioPreviewButtons(){
+ const defs=[['vnEpisodeBgm','BGM'],['vnSceneBgm','BGM'],['vnSceneAmb','환경음'],['vnSceneSe','SE']];
+ defs.forEach(([id,label])=>{const input=$('#'+id);if(!input||input.parentElement?.querySelector(`[data-vn-audio-for="${id}"]`))return;const b=document.createElement('button');b.type='button';b.className='vn-audio-preview-btn';b.dataset.vnAudioFor=id;b.textContent=`▶ ${label}`;input.parentElement?.appendChild(b);b.addEventListener('click',()=>previewVnAudio(id,b))})
+}
+async function previewVnAudio(id,button){
+ const url=$('#'+id)?.value.trim();if(!url){button.textContent='URL 없음';setTimeout(()=>button.textContent='▶ 미리듣기',900);return}
+ if(vnEditorAudioButton===button&&!vnEditorAudio.paused){vnEditorAudio.pause();button.classList.remove('is-playing');button.textContent='▶ 미리듣기';vnEditorAudioButton=null;return}
+ if(vnEditorAudioButton){vnEditorAudioButton.classList.remove('is-playing');vnEditorAudioButton.textContent='▶ 미리듣기'}
+ vnEditorAudio.pause();vnEditorAudio.src=url;vnEditorAudio.currentTime=0;vnEditorAudioButton=button;button.classList.add('is-playing');button.textContent='■ 정지';try{await vnEditorAudio.play()}catch(e){button.classList.remove('is-playing');button.textContent='재생 실패';setTimeout(()=>button.textContent='▶ 미리듣기',1000)}
+}
+vnEditorAudio.addEventListener('ended',()=>{if(vnEditorAudioButton){vnEditorAudioButton.classList.remove('is-playing');vnEditorAudioButton.textContent='▶ 미리듣기';vnEditorAudioButton=null}});
+function resetStudioSelection(){editingSceneIndex=-1;sceneFormDirty=false;scenePreviewLocalUrl='';$('#vnSceneInlineMount .vn-scene-paper')?.classList.remove('is-active');$('#vnSceneInspectorEmpty')?.removeAttribute('hidden');$('#vnStudioPreviewTitle').textContent='장면을 선택해 주세요';renderEditorScenePreview(null)}
+function newEpisode(){
+ mountSceneEditorInline();editingEpisodeId=null;editingScenes=[];$('#vnEpisodeId').value='';$('#vnEpisodeVisibility').value='private';$('#vnEpisodeChapter').value='';$('#vnEpisodeOrder').value='';$('#vnEpisodeTitle').value='';$('#vnEpisodeExcerpt').value='';$('#vnEpisodeBgm').value='';$('#vnEpisodeHeading').textContent='새 에피소드';$('#vnDeleteEpisode').style.display='none';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);openShade('vnEpisodeShade')
+}
 function openEpisodeEditor(id=activeEpisodeId){
- const ep=cache.find(x=>x.id===id&&x.section==='story');if(!ep)return;
- editingEpisodeId=ep.id;editingScenes=structuredClone(ep.scenes||[]);$('#vnEpisodeId').value=ep.id;$('#vnEpisodeVisibility').value=ep.status||'private';$('#vnEpisodeChapter').value=ep.subtitle||'';$('#vnEpisodeOrder').value=ep.sortOrder??'';$('#vnEpisodeTitle').value=ep.title||'';$('#vnEpisodeExcerpt').value=ep.excerpt||'';$('#vnEpisodeBgm').value=ep.bgmUrl||'';$('#vnEpisodeHeading').textContent=ep.title||'에피소드 편집';$('#vnDeleteEpisode').style.display='';renderSceneEditorList();openShade('vnEpisodeShade')
+ mountSceneEditorInline();const ep=cache.find(x=>x.id===id&&x.section==='story');if(!ep)return;
+ editingEpisodeId=ep.id;editingScenes=structuredClone(ep.scenes||[]);$('#vnEpisodeId').value=ep.id;$('#vnEpisodeVisibility').value=ep.status||'private';$('#vnEpisodeChapter').value=ep.subtitle||'';$('#vnEpisodeOrder').value=ep.sortOrder??'';$('#vnEpisodeTitle').value=ep.title||'';$('#vnEpisodeExcerpt').value=ep.excerpt||'';$('#vnEpisodeBgm').value=ep.bgmUrl||'';$('#vnEpisodeHeading').textContent=ep.title||'에피소드 편집';$('#vnDeleteEpisode').style.display='';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);openShade('vnEpisodeShade')
 }
 function renderSceneEditorList(){
  const list=$('#vnSceneEditorList');if(!list)return;
- list.innerHTML=editingScenes.length?editingScenes.map((s,i)=>`<div class="vn-scene-row" data-edit-scene="${i}"><span>${String(i+1).padStart(2,'0')}</span><b>${s.kind==='narration'?'서술':s.kind==='cg'?'CG':'대사'}</b><p>${esc((s.speaker?s.speaker+' · ':'')+(s.text||''))}</p><div class="row-actions"><button data-up="${i}">↑</button><button data-down="${i}">↓</button><button data-scene-open="${i}">수정</button></div></div>`).join(''):'<div class="cms-empty">아직 장면이 없습니다. 장면 추가를 눌러 시작하세요.</div>';
+ list.innerHTML=editingScenes.length?editingScenes.map((s,i)=>{const thumb=s.cgImage||s.background||'';return `<div class="vn-scene-row ${i===editingSceneIndex?'is-selected':''}" draggable="true" data-drag-index="${i}" data-edit-scene="${i}"><div class="vn-scene-thumb" data-num="${String(i+1).padStart(2,'0')}" ${thumb?`style="background-image:url('${esc(thumb)}')"`:''}>${thumb?'':(s.kind==='narration'?'文':s.kind==='cg'?'圖':'言')}</div><div class="vn-scene-copy"><b>${s.kind==='narration'?'서술':s.kind==='cg'?'CG':'대사'}${s.speaker?' · '+esc(s.speaker):''}</b><p>${esc(s.text||'(내용 없음)')}</p></div><div class="row-actions"><button data-up="${i}">↑</button><button data-down="${i}">↓</button><button data-scene-open="${i}">수정</button></div></div>`}).join(''):'<div class="cms-empty">아직 장면이 없습니다. + 장면을 눌러 시작하세요.</div>';
  list.querySelectorAll('[data-scene-open]').forEach(b=>b.onclick=e=>{e.stopPropagation();openSceneEditor(Number(b.dataset.sceneOpen))});
- list.querySelectorAll('[data-up]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=Number(b.dataset.up);if(i>0){[editingScenes[i-1],editingScenes[i]]=[editingScenes[i],editingScenes[i-1]];renderSceneEditorList()}});
- list.querySelectorAll('[data-down]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=Number(b.dataset.down);if(i<editingScenes.length-1){[editingScenes[i+1],editingScenes[i]]=[editingScenes[i],editingScenes[i+1]];renderSceneEditorList()}});
+ list.querySelectorAll('[data-edit-scene]').forEach(row=>{
+  row.onclick=e=>{if(e.target.closest('button'))return;openSceneEditor(Number(row.dataset.editScene))};
+  row.addEventListener('dragstart',e=>{row.classList.add('is-dragging');e.dataTransfer.setData('text/plain',row.dataset.dragIndex);e.dataTransfer.effectAllowed='move'});
+  row.addEventListener('dragend',()=>row.classList.remove('is-dragging'));
+  row.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move'});
+  row.addEventListener('drop',e=>{e.preventDefault();const from=Number(e.dataTransfer.getData('text/plain')),to=Number(row.dataset.dragIndex);if(Number.isNaN(from)||from===to)return;const [moved]=editingScenes.splice(from,1);editingScenes.splice(to,0,moved);editingSceneIndex=to;setStudioDirty(true);renderSceneEditorList();openSceneEditor(to,{skipConfirm:true})});
+ });
+ list.querySelectorAll('[data-up]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=Number(b.dataset.up);if(i>0){[editingScenes[i-1],editingScenes[i]]=[editingScenes[i],editingScenes[i-1]];editingSceneIndex=i-1;setStudioDirty(true);renderSceneEditorList();openSceneEditor(i-1,{skipConfirm:true})}});
+ list.querySelectorAll('[data-down]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=Number(b.dataset.down);if(i<editingScenes.length-1){[editingScenes[i+1],editingScenes[i]]=[editingScenes[i],editingScenes[i+1]];editingSceneIndex=i+1;setStudioDirty(true);renderSceneEditorList();openSceneEditor(i+1,{skipConfirm:true})}});
 }
 function refreshArchiveSelect(){
  const sel=$('#vnSceneArchive');if(!sel)return;
  const val=sel.value;sel.innerHTML='<option value="">없음</option>'+cache.filter(x=>x.section==='archive').map(x=>`<option value="${x.id}">${esc(x.dateLabel||'記錄')} · ${esc(x.title||'')}</option>`).join('');sel.value=val;
 }
-function openSceneEditor(i=-1){
- editingSceneIndex=i;
+function openSceneEditor(i=-1,opts={}){
+ mountSceneEditorInline();if(sceneFormDirty&&!opts.skipConfirm&&!confirm('현재 장면의 적용하지 않은 수정 내용을 버리고 다른 장면을 열까요?'))return;
+ editingSceneIndex=i;sceneFormDirty=false;scenePreviewLocalUrl='';
  const s=i>=0?editingScenes[i]:{kind:'dialogue',speaker:'',text:'',background:'',leftImage:'',rightImage:'',cgImage:'',effect:'fade',archiveId:'',bgmAction:'keep',bgmUrl:'',ambAction:'keep',ambUrl:'',seUrl:'',soundNote:''};
- $('#vnSceneHeading').textContent=i>=0?`장면 ${i+1} 편집`:'새 장면';$('#vnSceneIndex').value=i;$('#vnSceneKind').value=s.kind||'dialogue';$('#vnSceneSpeaker').value=s.speaker||'';$('#vnSceneEffect').value=s.effect||'fade';$('#vnSceneText').value=s.text||'';$('#vnSceneBackground').value=s.background||'';$('#vnSceneLeft').value=s.leftImage||'';$('#vnSceneRight').value=s.rightImage||'';$('#vnSceneCg').value=s.cgImage||'';$('#vnSceneBgmAction').value=s.bgmAction||'keep';$('#vnSceneBgm').value=s.bgmUrl||'';$('#vnSceneSe').value=s.seUrl||'';$('#vnSceneAmbAction').value=s.ambAction||'keep';$('#vnSceneAmb').value=s.ambUrl||'';$('#vnSceneSoundNote').value=s.soundNote||'';refreshArchiveSelect();$('#vnSceneArchive').value=s.archiveId||'';previewSceneImage(s.cgImage||s.background||'');$('#vnDeleteScene').style.display=i>=0?'':'none';$('#vnSceneStatus').textContent='';openShade('vnSceneShade')
+ $('#vnSceneHeading').textContent=i>=0?`장면 ${i+1} 편집`:'새 장면';$('#vnSceneIndex').value=i;$('#vnSceneKind').value=s.kind||'dialogue';$('#vnSceneSpeaker').value=s.speaker||'';$('#vnSceneEffect').value=s.effect||'fade';$('#vnSceneText').value=s.text||'';$('#vnSceneBackground').value=s.background||'';$('#vnSceneLeft').value=s.leftImage||'';$('#vnSceneRight').value=s.rightImage||'';$('#vnSceneCg').value=s.cgImage||'';$('#vnSceneBgmAction').value=s.bgmAction||'keep';$('#vnSceneBgm').value=s.bgmUrl||'';$('#vnSceneSe').value=s.seUrl||'';$('#vnSceneAmbAction').value=s.ambAction||'keep';$('#vnSceneAmb').value=s.ambUrl||'';$('#vnSceneSoundNote').value=s.soundNote||'';refreshArchiveSelect();$('#vnSceneArchive').value=s.archiveId||'';$('#vnDeleteScene').style.display=i>=0?'':'none';$('#vnDuplicateScene').style.display=i>=0?'':'none';$('#vnSceneStatus').textContent='';$('#vnSceneInspectorEmpty')?.setAttribute('hidden','');$('#vnSceneInlineMount .vn-scene-paper')?.classList.add('is-active');$('#vnStudioPreviewTitle').textContent=i>=0?`SCENE ${String(i+1).padStart(2,'0')}`:'NEW SCENE';renderSceneEditorList();renderEditorScenePreview(s);
 }
-function previewSceneImage(src){const el=$('#vnScenePreview');if(!el)return;el.style.backgroundImage=src?`url("${src}")`:'';el.innerHTML=src?'':'<span>SCENE IMAGE PREVIEW</span>'}
-['vnSceneBackground','vnSceneCg'].forEach(id=>$('#'+id)?.addEventListener('input',()=>previewSceneImage($('#vnSceneCg').value.trim()||$('#vnSceneBackground').value.trim())));
-$('#vnSceneFile')?.addEventListener('change',e=>previewFile(e.target.files?.[0],url=>previewSceneImage(url)));
+function previewSceneImage(src){scenePreviewLocalUrl=src||'';renderEditorScenePreview()}
 $('#vnAddScene')?.addEventListener('click',()=>openSceneEditor(-1));
 $('#vnSaveScene')?.addEventListener('click',()=>{
- const s={kind:$('#vnSceneKind').value,speaker:$('#vnSceneSpeaker').value.trim(),text:$('#vnSceneText').value,background:$('#vnSceneBackground').value.trim(),leftImage:$('#vnSceneLeft').value.trim(),rightImage:$('#vnSceneRight').value.trim(),cgImage:$('#vnSceneCg').value.trim(),effect:$('#vnSceneEffect').value,archiveId:$('#vnSceneArchive').value,bgmAction:$('#vnSceneBgmAction').value,bgmUrl:$('#vnSceneBgm').value.trim(),ambAction:$('#vnSceneAmbAction').value,ambUrl:$('#vnSceneAmb').value.trim(),seUrl:$('#vnSceneSe').value.trim(),soundNote:$('#vnSceneSoundNote').value.trim()};
- if(editingSceneIndex>=0)editingScenes[editingSceneIndex]=s;else editingScenes.push(s);renderSceneEditorList();closeShade('vnSceneShade')
+ const s=sceneDraftFromForm();if(editingSceneIndex>=0)editingScenes[editingSceneIndex]=s;else{editingScenes.push(s);editingSceneIndex=editingScenes.length-1}
+ sceneFormDirty=false;scenePreviewLocalUrl='';setStudioDirty(true);renderSceneEditorList();openSceneEditor(editingSceneIndex,{skipConfirm:true});$('#vnSceneStatus').textContent='장면에 적용됨 · 에피소드 저장 시 게시됩니다.';
 });
-$('#vnDeleteScene')?.addEventListener('click',()=>{if(editingSceneIndex<0)return;if(confirm('이 장면을 삭제할까요?')){editingScenes.splice(editingSceneIndex,1);renderSceneEditorList();closeShade('vnSceneShade')}})
-$('#vnNewEpisode')?.addEventListener('click',newEpisode);$('#vnEditEpisode')?.addEventListener('click',()=>openEpisodeEditor());$('#vnEditScene')?.addEventListener('click',()=>{const ep=currentEpisode();if(!ep)return;openEpisodeEditor(ep.id);setTimeout(()=>openSceneEditor(activeSceneIndex),50)});
+$('#vnDuplicateScene')?.addEventListener('click',()=>{if(editingSceneIndex<0)return;const copy=structuredClone(sceneDraftFromForm());editingScenes.splice(editingSceneIndex+1,0,copy);editingSceneIndex++;sceneFormDirty=false;setStudioDirty(true);renderSceneEditorList();openSceneEditor(editingSceneIndex,{skipConfirm:true});$('#vnSceneStatus').textContent='복제됨'});
+$('#vnDeleteScene')?.addEventListener('click',()=>{if(editingSceneIndex<0)return;if(confirm('이 장면을 삭제할까요?')){editingScenes.splice(editingSceneIndex,1);setStudioDirty(true);renderSceneEditorList();resetStudioSelection()}});
+$('#vnNewEpisode')?.addEventListener('click',newEpisode);$('#vnEditEpisode')?.addEventListener('click',()=>openEpisodeEditor());$('#vnEditScene')?.addEventListener('click',()=>{const ep=currentEpisode();if(!ep)return;openEpisodeEditor(ep.id);setTimeout(()=>openSceneEditor(activeSceneIndex,{skipConfirm:true}),50)});
+window.addEventListener('beforeunload',e=>{if(!episodeDirty)return;e.preventDefault();e.returnValue=''});
 $('#archiveEditRecord')?.addEventListener('click',()=>{if(currentArchiveId)openDoc(currentArchiveId)});
 
 /* ---------- SAVE ---------- */
@@ -441,6 +513,12 @@ async function syncEpisodeArchive(episodeId,payload,scenesForSave){
 
 $('#vnSaveEpisode')?.addEventListener('click',async()=>{
  if(!admin)return;const title=$('#vnEpisodeTitle').value.trim();if(!title){$('#vnEpisodeStatus').textContent='제목을 입력해 주세요.';return}
+ // 오른쪽 장면 설정을 수정한 채 바로 에피소드 저장을 눌러도 최신 내용까지 함께 반영합니다.
+ if(sceneFormDirty&&$('#vnSceneInlineMount .vn-scene-paper')?.classList.contains('is-active')){
+   const draft=sceneDraftFromForm();
+   if(editingSceneIndex>=0)editingScenes[editingSceneIndex]=draft;else{editingScenes.push(draft);editingSceneIndex=editingScenes.length-1}
+   sceneFormDirty=false;scenePreviewLocalUrl='';renderSceneEditorList();
+ }
  const payload={section:'story',status:$('#vnEpisodeVisibility').value,title,subtitle:$('#vnEpisodeChapter').value.trim(),excerpt:$('#vnEpisodeExcerpt').value.trim(),bgmUrl:$('#vnEpisodeBgm').value.trim(),sortOrder:$('#vnEpisodeOrder').value===''?null:Number($('#vnEpisodeOrder').value),scenes:structuredClone(editingScenes),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
  try{
    const wasNew=!editingEpisodeId;
@@ -465,7 +543,7 @@ $('#vnSaveEpisode')?.addEventListener('click',async()=>{
      if(replayScenes.length&&payload.bgmUrl&&(replayScenes[0].bgmAction||'keep')==='keep'){replayScenes[0].bgmAction='set';replayScenes[0].bgmUrl=payload.bgmUrl}
      try{await updateDoc(doc(db,'content',archiveId),{unlockMode:'story',replayEpisode:`${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,replayEpisodeId:editingEpisodeId,replayScenes,updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay sync failed',archiveId,err)}
    }
-   $('#vnEpisodeStatus').textContent='저장됨 · ARCHIVE에도 기록됨';await loadContent();closeShade('vnEpisodeShade')
+   $('#vnEpisodeStatus').textContent='저장됨 · ARCHIVE에도 기록됨';episodeDirty=false;sceneFormDirty=false;setStudioDirty(false);await loadContent();closeShade('vnEpisodeShade')
  }catch(e){console.error(e);$('#vnEpisodeStatus').textContent='저장 실패'}
 });
 $('#vnDeleteEpisode')?.addEventListener('click',async()=>{
@@ -476,7 +554,7 @@ $('#vnDeleteEpisode')?.addEventListener('click',async()=>{
    try{await deleteDoc(doc(db,'content',autoArchiveIdForEpisode(episodeId)))}catch(e){}
    const linked=cache.filter(x=>x.section==='archive'&&!x.isAutoStoryArchive&&x.replayEpisodeId===episodeId);
    for(const a of linked){try{await updateDoc(doc(db,'content',a.id),{replayScenes:[],replayEpisode:'',replayEpisodeId:'',updatedAt:serverTimestamp()})}catch(e){}}
-   activeEpisodeId=null;editingEpisodeId=null;await loadContent();closeShade('vnEpisodeShade')
+   activeEpisodeId=null;editingEpisodeId=null;episodeDirty=false;sceneFormDirty=false;await loadContent();closeShade('vnEpisodeShade')
  }catch(e){$('#vnEpisodeStatus').textContent='삭제 실패'}
 })
 
