@@ -200,6 +200,7 @@ function renderScene(){
   if(s.effect==='fade'){stage.animate([{opacity:.35},{opacity:1}],{duration:360,easing:'ease-out'})}
   applyVnSound(ep,s);
   if(s.archiveId)unlockArchive(s.archiveId);
+  if(s.autoArchiveId)unlockArchive(s.autoArchiveId);
   if(!logRows.length || logRows.at(-1)?.idx!==activeSceneIndex)logRows.push({idx:activeSceneIndex,speaker:s.speaker||'',text:s.text||''});
   renderLog();
 }
@@ -252,7 +253,7 @@ async function loadCharacterPairs(){
  }catch(e){console.warn('character pairs load failed',e)}
 }
 function renderCharacter(){refreshPairCards()}
-function rowValue(side,label){const found=(side?.rows||[]).find(r=>r?.[0]===label);return found?.[1]||''}
+function rowValue(side,label){const found=(side?.rows||[]).find(r=>(Array.isArray(r)?r?.[0]:r?.label)===label);return Array.isArray(found)?(found?.[1]||''):(found?.value||'')}
 function setPairInput(id,v=''){const el=$('#'+id);if(el)el.value=v??''}
 function pairPreview(elId,src,label){const el=$('#'+elId);if(!el)return;el.style.backgroundImage=src?`url("${String(src).replace(/"/g,'%22')}")`:'';el.textContent=src?'':label}
 function fillPairEditor(key){
@@ -267,10 +268,10 @@ function fillPairEditor(key){
  pairPreview('pairLeftPreview',p.leftImage,'LEFT FULLBODY');pairPreview('pairRightPreview',p.rightImage,'RIGHT FULLBODY');$('#pairEditorStatus').textContent='';
 }
 function openPairEditor(key='pair01'){if(!admin)return;fillPairEditor(pairMap()[key]?key:'pair01');openShade('pairEditorShade')}
-function collectSide(prefix){return {name:$('#'+prefix+'Name').value.trim(),quote:$('#'+prefix+'Quote').value.trim(),catchphrase:$('#'+prefix+'Catch').value.trim(),gender:$('#'+prefix+'Gender').value.trim(),height:$('#'+prefix+'Height').value.trim(),age:$('#'+prefix+'Age').value.trim(),race:$('#'+prefix+'Race').value.trim(),realm:$('#'+prefix+'Realm').value.trim(),rows:[['외형',$('#'+prefix+'Appearance').value],['성격',$('#'+prefix+'Personality').value],['능력',$('#'+prefix+'Ability').value],['천명 또는 목표',$('#'+prefix+'Destiny').value],['중요한 인연',$('#'+prefix+'Relation').value],['기타',$('#'+prefix+'Other').value]]}}
+function collectSide(prefix){return {name:$('#'+prefix+'Name').value.trim(),quote:$('#'+prefix+'Quote').value.trim(),catchphrase:$('#'+prefix+'Catch').value.trim(),gender:$('#'+prefix+'Gender').value.trim(),height:$('#'+prefix+'Height').value.trim(),age:$('#'+prefix+'Age').value.trim(),race:$('#'+prefix+'Race').value.trim(),realm:$('#'+prefix+'Realm').value.trim(),rows:[{label:'외형',value:$('#'+prefix+'Appearance').value},{label:'성격',value:$('#'+prefix+'Personality').value},{label:'능력',value:$('#'+prefix+'Ability').value},{label:'천명 또는 목표',value:$('#'+prefix+'Destiny').value},{label:'중요한 인연',value:$('#'+prefix+'Relation').value},{label:'기타',value:$('#'+prefix+'Other').value}]}}
 async function savePairProfile(){
  if(!admin)return;const key=$('#pairEditorKey').value;const payload={title:$('#pairTitleInput').value.trim()||key.toUpperCase(),subtitle:$('#pairSubtitleInput').value.trim(),previewImage:$('#pairPreviewInput').value.trim(),leftImage:$('#pairLeftImage').value.trim(),rightImage:$('#pairRightImage').value.trim(),left:collectSide('pairLeft'),right:collectSide('pairRight'),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
- try{await setDoc(doc(db,'characterPairs',key),payload,{merge:true});mergePair(pairMap()[key],payload);refreshPairCards();$('#pairEditorStatus').textContent='저장됨';const dialog=$('#pairDialog');if(dialog?.open&&dialog.dataset.activePair===key&&window.CHEONSANGHEUN_OPEN_PAIR){dialog.close();setTimeout(()=>window.CHEONSANGHEUN_OPEN_PAIR(key),30)}}catch(e){console.error(e);$('#pairEditorStatus').textContent='저장 실패'}
+ try{await setDoc(doc(db,'characterPairs',key),payload,{merge:true});mergePair(pairMap()[key],payload);refreshPairCards();$('#pairEditorStatus').textContent='저장됨';const dialog=$('#pairDialog');if(dialog?.open&&dialog.dataset.activePair===key&&window.CHEONSANGHEUN_OPEN_PAIR){dialog.close();setTimeout(()=>window.CHEONSANGHEUN_OPEN_PAIR(key),30)}}catch(e){console.error('pair save failed',e);$('#pairEditorStatus').textContent=`저장 실패 · ${e?.code||e?.message||'unknown error'}`}
 }
 $('#characterPairManager')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
 $('#pairProfileEditBtn')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
@@ -411,17 +412,68 @@ async function saveDoc(){
 $('#cmsSaveDoc')?.addEventListener('click',saveDoc);
 $('#cmsDeleteDoc')?.addEventListener('click',async()=>{const id=$('#cmsDocId').value;if(!id||!confirm('이 문서를 삭제할까요?'))return;try{await deleteDoc(doc(db,'content',id));await loadContent();closeShade('cmsDocShade')}catch(e){$('#cmsDocStatus').textContent='삭제 실패'}})
 $('#cmsSavePage')?.addEventListener('click',async()=>{if(!admin)return;const payload={title:$('#cmsPageTitle').value.trim(),intro:$('#cmsPageIntro').value,status:$('#cmsPageStatus').value,lockedMessage:$('#cmsLockedMessage').value.trim(),kicker:$('#cmsPageKicker').value.trim(),updatedAt:serverTimestamp(),editorName:$('#cmsEditorName')?.value.trim()||''};try{await setDoc(doc(db,'pages',activeSection),payload,{merge:true});pageCache[activeSection]={...(pageCache[activeSection]||defaults[activeSection]),...payload};applyPage(activeSection);$('#cmsPageStatusText').textContent='저장됨';closeShade('cmsPageShade')}catch(e){$('#cmsPageStatusText').textContent='저장 실패'}})
+function autoArchiveIdForEpisode(episodeId){return `story-${episodeId}`}
+async function syncEpisodeArchive(episodeId,payload,scenesForSave){
+ const archiveId=autoArchiveIdForEpisode(episodeId);
+ const ref=doc(db,'content',archiveId);
+ const snap=await getDoc(ref);
+ const replayScenes=structuredClone(scenesForSave||[]);
+ if(replayScenes.length&&payload.bgmUrl&&(replayScenes[0].bgmAction||'keep')==='keep'){
+   replayScenes[0].bgmAction='set';replayScenes[0].bgmUrl=payload.bgmUrl;
+ }
+ const archivePayload={
+   section:'archive',status:payload.status,title:payload.title,subtitle:'STORY',
+   dateLabel:payload.subtitle||'STORY RECORD',excerpt:payload.excerpt||'',body:payload.excerpt||'',
+   sortOrder:payload.sortOrder,imageUrl:(replayScenes.find(x=>x.cgImage)?.cgImage||replayScenes.find(x=>x.background)?.background||''),
+   unlockMode:'story',replayEpisode:`${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,
+   replayEpisodeId:episodeId,replayScenes,sourceEpisodeId:episodeId,isAutoStoryArchive:true,
+   editorName:payload.editorName||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()
+ };
+ if(!snap.exists())archivePayload.createdAt=serverTimestamp();
+ await setDoc(ref,archivePayload,{merge:true});
+ return archiveId;
+}
+
 $('#vnSaveEpisode')?.addEventListener('click',async()=>{
  if(!admin)return;const title=$('#vnEpisodeTitle').value.trim();if(!title){$('#vnEpisodeStatus').textContent='제목을 입력해 주세요.';return}
- const payload={section:'story',status:$('#vnEpisodeVisibility').value,title,subtitle:$('#vnEpisodeChapter').value.trim(),excerpt:$('#vnEpisodeExcerpt').value.trim(),bgmUrl:$('#vnEpisodeBgm').value.trim(),sortOrder:$('#vnEpisodeOrder').value===''?null:Number($('#vnEpisodeOrder').value),scenes:editingScenes,editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
- try{if(editingEpisodeId)await updateDoc(doc(db,'content',editingEpisodeId),payload);else{payload.createdAt=serverTimestamp();const r=await addDoc(collection(db,'content'),payload);editingEpisodeId=r.id}activeEpisodeId=editingEpisodeId;
- const archiveIds=[...new Set(editingScenes.map(x=>x.archiveId).filter(Boolean))];
- const oldLinked=cache.filter(x=>x.section==='archive'&&x.replayEpisodeId===editingEpisodeId&&!archiveIds.includes(x.id));
- for(const old of oldLinked){try{await updateDoc(doc(db,'content',old.id),{replayScenes:[],replayEpisode:'',replayEpisodeId:'',updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay clear failed',old.id,err)}}
- for(const archiveId of archiveIds){const replayScenes=editingScenes.filter(x=>x.archiveId===archiveId).map(x=>structuredClone(x));if(replayScenes.length&&payload.bgmUrl&&(replayScenes[0].bgmAction||'keep')==='keep'){replayScenes[0].bgmAction='set';replayScenes[0].bgmUrl=payload.bgmUrl}try{await updateDoc(doc(db,'content',archiveId),{unlockMode:'story',replayEpisode:`${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,replayEpisodeId:editingEpisodeId,replayScenes,updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay sync failed',archiveId,err)}}
- $('#vnEpisodeStatus').textContent='저장됨';await loadContent();closeShade('vnEpisodeShade')}catch(e){console.error(e);$('#vnEpisodeStatus').textContent='저장 실패'}
+ const payload={section:'story',status:$('#vnEpisodeVisibility').value,title,subtitle:$('#vnEpisodeChapter').value.trim(),excerpt:$('#vnEpisodeExcerpt').value.trim(),bgmUrl:$('#vnEpisodeBgm').value.trim(),sortOrder:$('#vnEpisodeOrder').value===''?null:Number($('#vnEpisodeOrder').value),scenes:structuredClone(editingScenes),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
+ try{
+   const wasNew=!editingEpisodeId;
+   if(wasNew){payload.createdAt=serverTimestamp();const r=await addDoc(collection(db,'content'),payload);editingEpisodeId=r.id}
+   const autoArchiveId=autoArchiveIdForEpisode(editingEpisodeId);
+   const scenesForSave=structuredClone(editingScenes);
+   if(scenesForSave.length)scenesForSave[scenesForSave.length-1].autoArchiveId=autoArchiveId;
+   payload.scenes=scenesForSave;
+   if(wasNew)await updateDoc(doc(db,'content',editingEpisodeId),{scenes:scenesForSave,updatedAt:serverTimestamp()});
+   else await updateDoc(doc(db,'content',editingEpisodeId),payload);
+   activeEpisodeId=editingEpisodeId;
+
+   // STORY 전체를 ARCHIVE의 '다시 보기' 기록으로 자동 저장/업데이트합니다.
+   await syncEpisodeArchive(editingEpisodeId,payload,scenesForSave);
+
+   // 장면별로 별도 기록을 선택한 경우에는 기존 수동 연결도 그대로 유지합니다.
+   const archiveIds=[...new Set(editingScenes.map(x=>x.archiveId).filter(Boolean))];
+   const oldLinked=cache.filter(x=>x.section==='archive'&&!x.isAutoStoryArchive&&x.replayEpisodeId===editingEpisodeId&&!archiveIds.includes(x.id));
+   for(const old of oldLinked){try{await updateDoc(doc(db,'content',old.id),{replayScenes:[],replayEpisode:'',replayEpisodeId:'',updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay clear failed',old.id,err)}}
+   for(const archiveId of archiveIds){
+     const replayScenes=editingScenes.filter(x=>x.archiveId===archiveId).map(x=>structuredClone(x));
+     if(replayScenes.length&&payload.bgmUrl&&(replayScenes[0].bgmAction||'keep')==='keep'){replayScenes[0].bgmAction='set';replayScenes[0].bgmUrl=payload.bgmUrl}
+     try{await updateDoc(doc(db,'content',archiveId),{unlockMode:'story',replayEpisode:`${payload.subtitle||''}${payload.subtitle&&payload.title?' · ':''}${payload.title||''}`,replayEpisodeId:editingEpisodeId,replayScenes,updatedAt:serverTimestamp()})}catch(err){console.warn('archive replay sync failed',archiveId,err)}
+   }
+   $('#vnEpisodeStatus').textContent='저장됨 · ARCHIVE에도 기록됨';await loadContent();closeShade('vnEpisodeShade')
+ }catch(e){console.error(e);$('#vnEpisodeStatus').textContent='저장 실패'}
 });
-$('#vnDeleteEpisode')?.addEventListener('click',async()=>{if(!editingEpisodeId||!confirm('이 에피소드를 삭제할까요?'))return;try{await deleteDoc(doc(db,'content',editingEpisodeId));activeEpisodeId=null;await loadContent();closeShade('vnEpisodeShade')}catch(e){$('#vnEpisodeStatus').textContent='삭제 실패'}})
+$('#vnDeleteEpisode')?.addEventListener('click',async()=>{
+ if(!editingEpisodeId||!confirm('이 에피소드를 삭제할까요?'))return;
+ try{
+   const episodeId=editingEpisodeId;
+   await deleteDoc(doc(db,'content',episodeId));
+   try{await deleteDoc(doc(db,'content',autoArchiveIdForEpisode(episodeId)))}catch(e){}
+   const linked=cache.filter(x=>x.section==='archive'&&!x.isAutoStoryArchive&&x.replayEpisodeId===episodeId);
+   for(const a of linked){try{await updateDoc(doc(db,'content',a.id),{replayScenes:[],replayEpisode:'',replayEpisodeId:'',updatedAt:serverTimestamp()})}catch(e){}}
+   activeEpisodeId=null;editingEpisodeId=null;await loadContent();closeShade('vnEpisodeShade')
+ }catch(e){$('#vnEpisodeStatus').textContent='삭제 실패'}
+})
 
 $('#cmsExitEdit')?.addEventListener('click',()=>{const u=new URL(location.href);u.searchParams.delete('edit');location.href=u.pathname+u.hash});
 $('#cmsLogout')?.addEventListener('click',async()=>{if(auth)await signOut(auth);location.href='./index.html'});

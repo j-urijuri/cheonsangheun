@@ -3721,7 +3721,7 @@ const rightDetailList=document.getElementById('rightDetailList');
 let activePairKey=null;
 
 function renderProfile(target,rows){
-  target.innerHTML=rows.map(([dt,dd])=>`<div><dt>${dt}</dt><dd>${dd}</dd></div>`).join('');
+  target.innerHTML=(rows||[]).map(row=>{const dt=Array.isArray(row)?row[0]:row?.label;const dd=Array.isArray(row)?row[1]:row?.value;return `<div><dt>${dt||''}</dt><dd>${dd||''}</dd></div>`}).join('');
 }
 function loadLongImage(img,placeholder,path){
   img.removeAttribute('src');
@@ -4454,6 +4454,7 @@ if (window.dat && dat.GUI) {
 <div class="cms-field"><label>에피소드 제목</label><input id="vnEpisodeTitle" placeholder="제목"/></div>
 <div class="cms-field"><label>짧은 소개</label><input id="vnEpisodeExcerpt" placeholder="장 목록에 보일 한두 줄"/></div>
 <div class="cms-field"><label>에피소드 기본 BGM URL · 선택</label><div class="r2-field-row"><input id="vnEpisodeBgm" placeholder="https://... / 비워두면 없음"/><button class="r2-upload-btn" type="button" data-r2-upload data-r2-target="vnEpisodeBgm" data-r2-kind="audio" data-r2-accept="audio/*">BGM 업로드</button><button class="r2-remove-btn" type="button" data-r2-remove data-r2-target="vnEpisodeBgm">삭제</button></div><p class="scene-archive-note">에피소드 전체에서 반복됩니다. 장면에서 BGM을 교체하거나 정지할 수도 있습니다.</p></div>
+<div class="vn-optional-note"><b>ARCHIVE 自動記錄</b><span>에피소드를 저장하면 현재 장면 전체가 ARCHIVE의 다시 보기 기록으로 자동 저장·업데이트됩니다.</span></div>
 <div class="vn-scene-editor-head"><div><b>場面 LIST</b><small>장면을 클릭하면 수정할 수 있습니다.</small></div><button class="cms-btn primary" id="vnAddScene">+ 장면 추가</button></div>
 <div class="vn-scene-list" id="vnSceneEditorList"></div>
 <div class="cms-form-actions"><button class="cms-btn primary" id="vnSaveEpisode">에피소드 저장</button><button class="cms-btn danger" id="vnDeleteEpisode" style="display:none">에피소드 삭제</button><span class="cms-form-status" id="vnEpisodeStatus"></span></div>
@@ -4573,7 +4574,7 @@ if (window.dat && dat.GUI) {
 (()=>{
   const useFirebase=window.CHEONSANGHEUN_USE_FIREBASE===true;
   const sc=document.createElement('script');
-  sc.src=useFirebase?'./cms.js?v=63.2':'./demo.js?v=63.2';
+  sc.src=useFirebase?'./cms.js?v=63.4':'./demo.js?v=63.4';
   if(useFirebase) sc.type='module';
   document.body.appendChild(sc);
 })();
