@@ -401,31 +401,52 @@ function renderScene(){
   if(!logRows.length || logRows.at(-1)?.idx!==activeSceneIndex)logRows.push({idx:activeSceneIndex,speaker:s.speaker||'',text:s.text||''});
   renderLog();
 }
-function nextScene(){
-  const ep=currentEpisode(),scenes=ep?.scenes||[];if(!scenes.length)return;
-  if(activeSceneIndex<scenes.length-1){activeSceneIndex++;renderScene()}else stopAuto();
+let lastManualNavAt=0;
+function moveScene(delta,{manual=false}={}){
+  const ep=currentEpisode(),scenes=ep?.scenes||[];
+  if(!scenes.length)return;
+
+  // 사용자가 직접 조작하면 자동 재생을 즉시 끈다.
+  // 자동 타이머와 수동 클릭이 같은 순간 실행되어 두 장면씩 이동하는 현상을 막는다.
+  if(manual){
+    stopAuto();
+    const now=performance.now();
+    if(now-lastManualNavAt<180)return;
+    lastManualNavAt=now;
+  }
+
+  const nextIndex=Math.max(0,Math.min(activeSceneIndex+delta,scenes.length-1));
+  if(nextIndex===activeSceneIndex){
+    if(delta>0)stopAuto();
+    return;
+  }
+  activeSceneIndex=nextIndex;
+  renderScene();
 }
-function prevScene(){if(activeSceneIndex>0){activeSceneIndex--;renderScene()}}
+function nextScene(options={}){moveScene(1,options)}
+function prevScene(options={}){moveScene(-1,options)}
 function renderLog(){
   const p=$('#vnLogPanel');if(!p)return;
   p.innerHTML=logRows.map(r=>`<div class="vn-log-row">${r.speaker?`<b>${esc(r.speaker)}</b>`:''}${esc(r.text)}</div>`).join('')||'<div class="vn-log-row">아직 기록된 대사가 없습니다.</div>';
 }
 function stopAuto(){if(autoTimer){clearInterval(autoTimer);autoTimer=null}$('#vnAuto')?.classList.remove('is-active')}
-$('#vnNext')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();nextScene()});
-$('#vnBack')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();prevScene()});
+$('#vnNext')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();nextScene({manual:true})});
+$('#vnBack')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();prevScene({manual:true})});
 function advanceStoryByClick(e){
   // 아래 조작 버튼이나 기록창을 누른 경우에는 장면을 넘기지 않는다.
   if(e.target.closest('button,.vn-controls,.vn-log-panel,.vn-chapter-drawer'))return;
   const log=$('#vnLogPanel');
   if(log && !log.hidden)return;
-  nextScene();
+  // 더블클릭의 두 번째 click 이벤트는 무시한다.
+  if(typeof e.detail==='number' && e.detail>1)return;
+  nextScene({manual:true});
 }
 // 대사창은 vnStageBg 내부에 있으므로 별도 클릭 리스너를 달면 이벤트가 버블링되어
 // 한 번의 클릭에 두 장면이 넘어간다. 스테이지에서 한 번만 처리한다.
 $('#vnStageBg')?.addEventListener('click',advanceStoryByClick);
 $('#vnLog')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();$('#vnLogPanel').hidden=!$('#vnLogPanel').hidden});
 $('#vnMenu')?.addEventListener('click',()=>{$('.vn-chapter-drawer')?.scrollIntoView({behavior:'smooth',block:'nearest'})});
-$('#vnAuto')?.addEventListener('click',()=>{if(autoTimer){stopAuto();return}$('#vnAuto').classList.add('is-active');autoTimer=setInterval(nextScene,4200)});
+$('#vnAuto')?.addEventListener('click',()=>{if(autoTimer){stopAuto();return}$('#vnAuto').classList.add('is-active');autoTimer=setInterval(()=>nextScene(),4200)});
 $('#vnSound')?.addEventListener('click',toggleVnSound);updateVnSoundButton();
 
 /* ---------- CHARACTER · 10 PAIRS / 20 PROFILES ---------- */
