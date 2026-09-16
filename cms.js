@@ -269,8 +269,9 @@ function advanceStoryByClick(e){
   if(log && !log.hidden)return;
   nextScene();
 }
+// 대사창은 vnStageBg 내부에 있으므로 별도 클릭 리스너를 달면 이벤트가 버블링되어
+// 한 번의 클릭에 두 장면이 넘어간다. 스테이지에서 한 번만 처리한다.
 $('#vnStageBg')?.addEventListener('click',advanceStoryByClick);
-$('#vnDialogue')?.addEventListener('click',advanceStoryByClick);
 $('#vnLog')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();$('#vnLogPanel').hidden=!$('#vnLogPanel').hidden});
 $('#vnMenu')?.addEventListener('click',()=>{$('.vn-chapter-drawer')?.scrollIntoView({behavior:'smooth',block:'nearest'})});
 $('#vnAuto')?.addEventListener('click',()=>{if(autoTimer){stopAuto();return}$('#vnAuto').classList.add('is-active');autoTimer=setInterval(nextScene,4200)});
