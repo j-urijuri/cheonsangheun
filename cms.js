@@ -24,7 +24,7 @@ let editingScenes=[], editingEpisodeId=null, editingSceneIndex=-1;
 let currentArchiveId=null;
 let archiveReplayScenes=[], archiveReplayIndex=0;
 let localPreviewDataUrl='';
-
+\n/* ---------- R2 MEDIA UPLOADER ---------- */\nfunction r2Config(){return window.CHEONSANGHEUN_R2||{}}\nfunction r2Ready(){const c=r2Config();return !!(c.enabled&&c.endpoint&&!String(c.endpoint).includes('PASTE_'))}\nfunction r2Endpoint(){return String(r2Config().endpoint||'').replace(/\/$/,'')}\nfunction dispatchInput(el){el?.dispatchEvent(new Event('input',{bubbles:true}));el?.dispatchEvent(new Event('change',{bubbles:true}))}\nfunction chooseFile(accept='*/*'){return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.style.display='none';document.body.appendChild(input);input.addEventListener('change',()=>{const f=input.files?.[0]||null;input.remove();resolve(f)},{once:true});input.addEventListener('cancel',()=>{input.remove();resolve(null)},{once:true});input.click()})}\nasync function uploadR2File(file,kind,button){\n  if(!admin||!currentUser)throw new Error('관리자 로그인 후 업로드할 수 있습니다.');\n  if(!r2Ready())throw new Error('R2 Worker가 아직 연결되지 않았습니다. r2-config.js에 Worker 주소를 넣어 주세요.');\n  const maxImage=20*1024*1024,maxAudio=50*1024*1024;\n  if(file.type.startsWith('image/')&&file.size>maxImage)throw new Error('이미지는 20MB 이하만 업로드할 수 있습니다.');\n  if(file.type.startsWith('audio/')&&file.size>maxAudio)throw new Error('사운드는 50MB 이하만 업로드할 수 있습니다.');\n  const old=button?.textContent;if(button){button.classList.add('is-busy');button.textContent='업로드 중…'}\n  try{\n    const token=await currentUser.getIdToken(true);\n    const res=await fetch(`${r2Endpoint()}/upload?kind=${encodeURIComponent(kind||'misc')}`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':file.type||'application/octet-stream','X-File-Name':encodeURIComponent(file.name||'file')},body:file});\n    let data={};try{data=await res.json()}catch{}\n    if(!res.ok)throw new Error(data.error||`업로드 실패 (${res.status})`);\n    if(!data.url)throw new Error('업로드 주소를 받지 못했습니다.');\n    return data;\n  }finally{if(button){button.classList.remove('is-busy');button.textContent=old||'파일 업로드'}}\n}\nasync function removeR2Asset(value){\n  const url=String(value||'').trim();if(!url)return;\n  if(!r2Ready()||!url.startsWith(r2Endpoint()+'/media/'))return;\n  if(!admin||!currentUser)throw new Error('관리자 로그인 후 삭제할 수 있습니다.');\n  const token=await currentUser.getIdToken(true);\n  const res=await fetch(url,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});\n  if(!res.ok){let d={};try{d=await res.json()}catch{}throw new Error(d.error||`저장소 삭제 실패 (${res.status})`)}\n}\ndocument.addEventListener('click',async e=>{\n  const up=e.target.closest('[data-r2-upload]');\n  if(up){\n    e.preventDefault();\n    const target=document.getElementById(up.dataset.r2Target||'');if(!target)return;\n    try{const file=await chooseFile(up.dataset.r2Accept||'*/*');if(!file)return;const data=await uploadR2File(file,up.dataset.r2Kind||'misc',up);target.value=data.url;dispatchInput(target)}\n    catch(err){console.error(err);alert(err.message||'파일 업로드에 실패했습니다.')}\n    return;\n  }\n  const del=e.target.closest('[data-r2-remove]');\n  if(del){\n    e.preventDefault();const target=document.getElementById(del.dataset.r2Target||'');if(!target)return;\n    const value=target.value.trim();if(!value)return;\n    if(!confirm('이 파일 연결을 삭제할까요? R2에 업로드한 파일이면 저장소에서도 삭제됩니다.'))return;\n    const old=del.textContent;del.textContent='삭제 중…';del.disabled=true;\n    try{await removeR2Asset(value);target.value='';dispatchInput(target)}catch(err){console.error(err);alert(err.message||'삭제에 실패했습니다.')}finally{del.textContent=old;del.disabled=false}\n  }\n});\n
 const vnAudio={muted:true,bgm:new Audio(),amb:new Audio(),se:new Audio(),bgmUrl:'',ambUrl:'',episodeId:''};
 vnAudio.bgm.loop=true;vnAudio.amb.loop=true;vnAudio.bgm.volume=.55;vnAudio.amb.volume=.42;vnAudio.se.volume=.75;
 const replayAudio={muted:false,bgm:new Audio(),amb:new Audio(),se:new Audio(),bgmUrl:'',ambUrl:''};
@@ -80,12 +80,12 @@ function applyPage(key){
     root.querySelector('[data-cms-intro]')?.replaceChildren(document.createTextNode(data.intro||''));
     root.querySelector('[data-cms-kicker]')?.replaceChildren(document.createTextNode(data.kicker||''));
   }
-  const panel=$(`.panel[data-panel="${key}"]`), lock=panel?.querySelector('.private-panel'), cms=panel?.querySelector('.cms-panel');
+  const panel=$(`.panel[data-panel="${key}"]`), lock=panel?.querySelector('.private-panel'), cms=panel?.querySelector(key==='character'?'.character-live':'.cms-panel');
   if(lock){
     lock.querySelector('h2').textContent=data.title||defaults[key].title;
     lock.querySelector('p').textContent=data.lockedMessage||defaults[key].lockedMessage;
   }
-  if(admin || DEMO || data.status==='public'){if(cms)cms.style.display='flex';if(lock)lock.style.display='none'}
+  if(admin || DEMO || data.status==='public'){if(cms)cms.style.display=key==='character'?'block':'flex';if(lock)lock.style.display='none'}
   else{if(cms)cms.style.display='none';if(lock)lock.style.display='grid'}
 }
 
@@ -171,16 +171,66 @@ $('#vnMenu')?.addEventListener('click',()=>{$('.vn-chapter-drawer')?.scrollIntoV
 $('#vnAuto')?.addEventListener('click',()=>{if(autoTimer){stopAuto();return}$('#vnAuto').classList.add('is-active');autoTimer=setInterval(nextScene,4200)});
 $('#vnSound')?.addEventListener('click',toggleVnSound);updateVnSoundButton();
 
-/* ---------- CHARACTER ---------- */
-function renderCharacter(){
- const root=$('[data-cms-section="character"]');if(!root)return;
- const list=root.querySelector('[data-cms-list]'),status=root.querySelector('[data-cms-status]'),posts=visibleFor('character');
- status.textContent=admin?`${posts.length}개 인물 문서`:''; 
- if(!posts.length){list.innerHTML='<div class="cms-empty">아직 작성된 인물 문서가 없습니다.</div>';return}
- list.className='cms-content cms-character-grid';
- list.innerHTML=posts.map(p=>`<article class="cms-character-card" data-post-id="${p.id}" ${p.imageUrl?`style="background-image:linear-gradient(180deg,transparent 25%,rgba(8,7,6,.88)),url('${p.imageUrl}') ;background-size:cover;background-position:center"`:''}><h3>${esc(p.title||'(이름 없음)')}</h3><p>${esc(p.excerpt||'')}</p><small>${esc(p.subtitle||'CHARACTER')} · ${p.status==='public'?'公開':'非公開'}</small></article>`).join('');
- list.querySelectorAll('[data-post-id]').forEach(el=>el.onclick=()=>admin&&openDoc(el.dataset.postId));
+/* ---------- CHARACTER · 10 PAIRS / 20 PROFILES ---------- */
+const pairKeys=Array.from({length:10},(_,i)=>`pair${String(i+1).padStart(2,'0')}`);
+const pairRows=['외형','성격','능력','천명 또는 목표','중요한 인연','기타'];
+function pairMap(){return window.CHEONSANGHEUN_PAIR_DATA||{}}
+function mergePair(target,source){
+ if(!target||!source)return target;
+ Object.assign(target,source);
+ if(source.left)target.left={...(target.left||{}),...source.left};
+ if(source.right)target.right={...(target.right||{}),...source.right};
+ return target;
 }
+function refreshPairCards(){
+ const pairs=pairMap();
+ pairKeys.forEach((key,i)=>{
+   const p=pairs[key];const btn=document.querySelector(`[data-pair="${key}"]`);if(!p||!btn)return;
+   const b=btn.querySelector('.pair-option-info b'),small=btn.querySelector('.pair-option-info small');
+   if(b)b.textContent=p.title||`페어 ${String(i+1).padStart(2,'0')}`;
+   if(small)small.textContent=p.subtitle||'페어 기록';
+   if(p.previewImage)btn.style.setProperty('--pairPreview',`url("${String(p.previewImage).replace(/"/g,'%22')}")`);else btn.style.removeProperty('--pairPreview');
+ });
+}
+async function loadCharacterPairs(){
+ refreshPairCards();
+ if(DEMO||!configured||!admin||!db)return;
+ try{
+   const snap=await getDocs(collection(db,'characterPairs'));
+   const pairs=pairMap();
+   snap.docs.forEach(s=>{if(pairs[s.id])mergePair(pairs[s.id],s.data())});
+   refreshPairCards();
+ }catch(e){console.warn('character pairs load failed',e)}
+}
+function renderCharacter(){refreshPairCards()}
+function rowValue(side,label){const found=(side?.rows||[]).find(r=>r?.[0]===label);return found?.[1]||''}
+function setPairInput(id,v=''){const el=$('#'+id);if(el)el.value=v??''}
+function pairPreview(elId,src,label){const el=$('#'+elId);if(!el)return;el.style.backgroundImage=src?`url("${String(src).replace(/"/g,'%22')}")`:'';el.textContent=src?'':label}
+function fillPairEditor(key){
+ const p=pairMap()[key];if(!p)return;
+ $('#pairEditorKey').value=key;$('#pairEditorHeading').textContent=`${p.title||key.toUpperCase()} · 프로필 편집`;
+ setPairInput('pairTitleInput',p.title);setPairInput('pairSubtitleInput',p.subtitle);setPairInput('pairPreviewInput',p.previewImage||'');
+ pairPreview('pairCardPreview',p.previewImage,'PAIR CARD PREVIEW');
+ for(const [prefix,side,img] of [['pairLeft',p.left,p.leftImage],['pairRight',p.right,p.rightImage]]){
+   setPairInput(prefix+'Image',img||'');setPairInput(prefix+'Name',side?.name);setPairInput(prefix+'Catch',side?.catchphrase);setPairInput(prefix+'Quote',side?.quote);setPairInput(prefix+'Gender',side?.gender);setPairInput(prefix+'Height',side?.height);setPairInput(prefix+'Age',side?.age);setPairInput(prefix+'Race',side?.race);setPairInput(prefix+'Realm',side?.realm);
+   setPairInput(prefix+'Appearance',rowValue(side,'외형'));setPairInput(prefix+'Personality',rowValue(side,'성격'));setPairInput(prefix+'Ability',rowValue(side,'능력'));setPairInput(prefix+'Destiny',rowValue(side,'천명 또는 목표'));setPairInput(prefix+'Relation',rowValue(side,'중요한 인연'));setPairInput(prefix+'Other',rowValue(side,'기타'));
+ }
+ pairPreview('pairLeftPreview',p.leftImage,'LEFT FULLBODY');pairPreview('pairRightPreview',p.rightImage,'RIGHT FULLBODY');$('#pairEditorStatus').textContent='';
+}
+function openPairEditor(key='pair01'){if(!admin)return;fillPairEditor(pairMap()[key]?key:'pair01');openShade('pairEditorShade')}
+function collectSide(prefix){return {name:$('#'+prefix+'Name').value.trim(),quote:$('#'+prefix+'Quote').value.trim(),catchphrase:$('#'+prefix+'Catch').value.trim(),gender:$('#'+prefix+'Gender').value.trim(),height:$('#'+prefix+'Height').value.trim(),age:$('#'+prefix+'Age').value.trim(),race:$('#'+prefix+'Race').value.trim(),realm:$('#'+prefix+'Realm').value.trim(),rows:[['외형',$('#'+prefix+'Appearance').value],['성격',$('#'+prefix+'Personality').value],['능력',$('#'+prefix+'Ability').value],['천명 또는 목표',$('#'+prefix+'Destiny').value],['중요한 인연',$('#'+prefix+'Relation').value],['기타',$('#'+prefix+'Other').value]]}}
+async function savePairProfile(){
+ if(!admin)return;const key=$('#pairEditorKey').value;const payload={title:$('#pairTitleInput').value.trim()||key.toUpperCase(),subtitle:$('#pairSubtitleInput').value.trim(),previewImage:$('#pairPreviewInput').value.trim(),leftImage:$('#pairLeftImage').value.trim(),rightImage:$('#pairRightImage').value.trim(),left:collectSide('pairLeft'),right:collectSide('pairRight'),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
+ try{await setDoc(doc(db,'characterPairs',key),payload,{merge:true});mergePair(pairMap()[key],payload);refreshPairCards();$('#pairEditorStatus').textContent='저장됨';const dialog=$('#pairDialog');if(dialog?.open&&dialog.dataset.activePair===key&&window.CHEONSANGHEUN_OPEN_PAIR){dialog.close();setTimeout(()=>window.CHEONSANGHEUN_OPEN_PAIR(key),30)}}catch(e){console.error(e);$('#pairEditorStatus').textContent='저장 실패'}
+}
+$('#characterPairManager')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
+$('#pairProfileEditBtn')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
+$('#pairEditorClose')?.addEventListener('click',()=>closeShade('pairEditorShade'));
+$('#pairEditorKey')?.addEventListener('change',e=>fillPairEditor(e.target.value));
+$('#pairPreviewInput')?.addEventListener('input',e=>pairPreview('pairCardPreview',e.target.value.trim(),'PAIR CARD PREVIEW'));
+$('#pairLeftImage')?.addEventListener('input',e=>pairPreview('pairLeftPreview',e.target.value.trim(),'LEFT FULLBODY'));
+$('#pairRightImage')?.addEventListener('input',e=>pairPreview('pairRightPreview',e.target.value.trim(),'RIGHT FULLBODY'));
+$('#pairSaveBtn')?.addEventListener('click',savePairProfile);
 
 /* ---------- ARCHIVE ---------- */
 function renderArchive(){
@@ -265,7 +315,7 @@ $$('[data-cms-close="page"]').forEach(b=>b.onclick=()=>closeShade('cmsPageShade'
 $$('[data-vn-close="episode"]').forEach(b=>b.onclick=()=>closeShade('vnEpisodeShade'));
 $$('[data-vn-close="scene"]').forEach(b=>b.onclick=()=>closeShade('vnSceneShade'));
 $$('.cms-editor-shade').forEach(sh=>sh.addEventListener('click',e=>{if(e.target===sh)closeShade(sh.id)}));
-$$('[data-cms-new]').forEach(b=>b.onclick=()=>resetDoc(b.closest('[data-cms-section]').dataset.cmsSection));
+$$('[data-cms-new]').forEach(b=>b.onclick=()=>{const sec=b.closest('[data-cms-section]')?.dataset.cmsSection;if(sec==='character')return;resetDoc(sec)});
 $$('[data-cms-page-edit]').forEach(b=>b.onclick=()=>openPage(b.closest('[data-cms-section]').dataset.cmsSection));
 
 /* ---------- EPISODE / SCENE EDITOR ---------- */
@@ -332,7 +382,7 @@ async function start(){
  if(DEMO||!configured){
    admin=DEMO && new URLSearchParams(location.search).get('editor')==='1';
    if(admin)showCmsForAdmin();else hideAdminControls();
-   await loadPages();await loadContent();
+   await loadPages();await loadCharacterPairs();await loadContent();
    if(DEMO){$$('.rail button[data-locked="true"]').forEach(b=>{b.dataset.locked='false';b.querySelector('.rail-lock')?.remove()})}
    return;
  }
@@ -341,7 +391,7 @@ async function start(){
    currentUser=user;admin=!!(user&&user.uid===ADMIN_UID);
    if(editRequested&&!admin){location.href='./admin.html';return}
    if(admin&&editRequested)showCmsForAdmin();else hideAdminControls();
-   await loadPages();await loadContent();
+   await loadPages();await loadCharacterPairs();await loadContent();
  });
 }
 start();

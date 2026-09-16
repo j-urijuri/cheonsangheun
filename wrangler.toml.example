@@ -1,0 +1,7 @@
+name = "cheonsangheun-media"
+main = "cloudflare-r2-worker.js"
+compatibility_date = "2026-09-16"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "cheonsangheun-media"
