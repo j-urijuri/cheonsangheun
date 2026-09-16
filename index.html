@@ -2800,6 +2800,292 @@ button{font:inherit}
   transform:translateY(-0.5px)!important;
 }
 
+
+
+/* ===== v44 archive menu = world menu ===== */
+.archive .archive-window{
+  grid-template-columns:280px minmax(0,1fr)!important;
+  column-gap:28px!important;
+}
+.archive .archive-index{
+  min-height:0!important;
+  padding:31px 8px 34px 26px!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  overflow:auto!important;
+}
+.archive .archive-index .archive-kicker{
+  margin:0 0 22px!important;
+  padding:0!important;
+  border:0!important;
+  color:rgba(61,47,37,.44)!important;
+  font-family:var(--title)!important;
+  font-size:10px!important;
+  letter-spacing:.28em!important;
+}
+.archive .archive-list.world-tabs{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:0!important;
+  min-height:0!important;
+  padding:0!important;
+  margin:0!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+.archive .archive-list.world-tabs button{
+  position:relative!important;
+  width:100%!important;
+  min-height:54px!important;
+  display:grid!important;
+  grid-template-columns:30px minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:10px!important;
+  margin:0!important;
+  padding:12px 2px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:rgba(56,43,34,.58)!important;
+  text-align:left!important;
+  transform:none!important;
+  transition:color .16s ease,transform .16s ease!important;
+}
+.archive .archive-list.world-tabs button::before,
+.archive .archive-list.world-tabs button::after{display:none!important;content:none!important}
+.archive .archive-list.world-tabs button:hover,
+.archive .archive-list.world-tabs button.is-active{
+  padding-left:2px!important;
+  color:#2d241f!important;
+  background:transparent!important;
+  border:0!important;
+  transform:translateX(3px)!important;
+}
+.archive .archive-list.world-tabs button > span:first-child{
+  position:static!important;
+  width:auto!important;
+  min-width:0!important;
+  height:auto!important;
+  margin:0!important;
+  padding:0!important;
+  display:block!important;
+  transform:none!important;
+  text-align:left!important;
+  font-family:var(--title)!important;
+  font-size:9px!important;
+  line-height:normal!important;
+  letter-spacing:.06em!important;
+  color:rgba(69,54,43,.38)!important;
+}
+.archive .archive-list.world-tabs button > span:first-child::after{
+  content:"·"!important;
+  display:none!important;
+  position:static!important;
+  width:auto!important;
+  height:auto!important;
+  margin-left:6px!important;
+  border-radius:0!important;
+  background:none!important;
+  transform:none!important;
+  color:var(--seal)!important;
+  font-size:16px!important;
+  line-height:0!important;
+  vertical-align:-2px!important;
+}
+.archive .archive-list.world-tabs button.is-active > span:first-child::after{
+  display:inline-block!important;
+}
+.archive .archive-list.world-tabs button b{
+  justify-self:stretch!important;
+  align-self:center!important;
+  font-family:var(--title)!important;
+  font-size:18px!important;
+  font-weight:400!important;
+  letter-spacing:.07em!important;
+  color:inherit!important;
+}
+.archive .archive-list.world-tabs button small{
+  justify-self:auto!important;
+  align-self:center!important;
+  font-family:var(--title)!important;
+  font-size:10px!important;
+  letter-spacing:.10em!important;
+  color:rgba(69,54,43,.38)!important;
+}
+@media(max-width:1000px){
+  .archive .archive-window{grid-template-columns:240px minmax(0,1fr)!important}
+}
+@media(max-width:720px){
+  .archive .archive-window{display:flex!important;flex-direction:column!important;column-gap:0!important}
+  .archive .archive-index{
+    flex:0 0 auto!important;
+    padding:18px 18px 12px!important;
+    border-right:0!important;
+    border-bottom:1px solid rgba(83,69,59,.10)!important;
+    max-height:220px!important;
+  }
+  .archive .archive-list.world-tabs{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+  }
+  .archive .archive-list.world-tabs button{margin:0!important}
+}
+
+
+/* ===== v45 world menu = archive menu ===== */
+.world .world-window{
+  grid-template-columns:280px minmax(0,1fr)!important;
+  column-gap:28px!important;
+}
+.world .world-index{
+  min-height:0!important;
+  padding:31px 8px 34px 26px!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  overflow:auto!important;
+}
+.world .world-index .index-kicker{
+  margin:0 0 22px!important;
+  padding:0!important;
+  border:0!important;
+  color:rgba(61,47,37,.44)!important;
+  font-family:var(--title)!important;
+  font-size:10px!important;
+  letter-spacing:.28em!important;
+}
+.world .world-tabs{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:0!important;
+  min-height:0!important;
+  padding:0!important;
+  margin:0!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+.world .world-tabs button{
+  position:relative!important;
+  width:100%!important;
+  min-height:54px!important;
+  display:grid!important;
+  grid-template-columns:30px minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:10px!important;
+  margin:0!important;
+  padding:12px 2px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:rgba(56,43,34,.58)!important;
+  text-align:left!important;
+  transform:none!important;
+  transition:color .16s ease,transform .16s ease!important;
+}
+.world .world-tabs button::before,
+.world .world-tabs button::after{
+  display:none!important;
+  content:none!important;
+}
+.world .world-tabs button:hover,
+.world .world-tabs button.is-active{
+  padding-left:2px!important;
+  color:#2d241f!important;
+  background:transparent!important;
+  border:0!important;
+  transform:translateX(3px)!important;
+}
+.world .world-tabs button > span:first-child{
+  position:static!important;
+  width:auto!important;
+  min-width:0!important;
+  height:auto!important;
+  margin:0!important;
+  padding:0!important;
+  display:block!important;
+  transform:none!important;
+  text-align:left!important;
+  font-family:var(--title)!important;
+  font-size:9px!important;
+  line-height:normal!important;
+  letter-spacing:.06em!important;
+  color:rgba(69,54,43,.38)!important;
+}
+.world .world-tabs button > span:first-child::after{
+  content:"·"!important;
+  display:none!important;
+  position:static!important;
+  width:auto!important;
+  height:auto!important;
+  margin-left:6px!important;
+  border-radius:0!important;
+  background:none!important;
+  transform:none!important;
+  color:var(--seal)!important;
+  font-size:16px!important;
+  line-height:0!important;
+  vertical-align:-2px!important;
+}
+.world .world-tabs button.is-active > span:first-child::after{
+  display:inline-block!important;
+}
+.world .world-tabs button b{
+  justify-self:stretch!important;
+  align-self:center!important;
+  font-family:var(--title)!important;
+  font-size:18px!important;
+  font-weight:400!important;
+  letter-spacing:.07em!important;
+  color:inherit!important;
+}
+.world .world-tabs button small{
+  justify-self:auto!important;
+  align-self:center!important;
+  font-family:var(--title)!important;
+  font-size:10px!important;
+  letter-spacing:.10em!important;
+  color:rgba(69,54,43,.38)!important;
+}
+@media(max-width:1000px){
+  .world .world-window{grid-template-columns:240px minmax(0,1fr)!important}
+}
+@media(max-width:720px){
+  .world .world-window{
+    display:flex!important;
+    flex-direction:column!important;
+    column-gap:0!important;
+  }
+  .world .world-index{
+    flex:0 0 auto!important;
+    padding:18px 18px 12px!important;
+    border-right:0!important;
+    border-bottom:1px solid rgba(83,69,59,.10)!important;
+    max-height:220px!important;
+  }
+  .world .world-tabs{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+  }
+  .world .world-tabs button{margin:0!important}
+}
+
 </style>
 </head>
 <body>
@@ -2840,13 +3126,13 @@ button{font:inherit}
 <header class="world-title-wrap"><div class="hanja-section-title"><b>世界觀</b><span>세계관</span></div></header>
 <div class="section-window world-window">
 <div class="world-index">
-<p class="index-kicker">세계 목차</p>
+<p class="index-kicker">세계 목록</p>
 <nav aria-label="세계관 세부 메뉴" class="world-tabs">
-<button class="is-active" data-world-tab="realm"><span>01</span><b>삼계</b><small>三界</small></button>
-<button data-world-tab="ascension"><span>02</span><b>승선</b><small>昇仙</small></button>
-<button data-world-tab="trial"><span>03</span><b>천겁</b><small>天劫</small></button>
-<button data-world-tab="fate"><span>04</span><b>참연겁</b><small>斬緣劫</small></button>
-<button data-world-tab="race"><span>05</span><b>종족</b><small>種族</small></button>
+<button class="is-active" data-world-tab="realm"><span>一</span><b>삼계</b><small>三界</small></button>
+<button data-world-tab="ascension"><span>二</span><b>승선</b><small>昇仙</small></button>
+<button data-world-tab="trial"><span>三</span><b>천겁</b><small>天劫</small></button>
+<button data-world-tab="fate"><span>四</span><b>참연겁</b><small>斬緣劫</small></button>
+<button data-world-tab="race"><span>五</span><b>종족</b><small>種族</small></button>
 </nav>
 </div>
 <div class="world-paper">
@@ -3015,8 +3301,9 @@ button{font:inherit}
 <div class="archive-layout">
 <header class="archive-title-wrap"><div class="hanja-section-title"><b>記錄</b><span>기록</span></div></header>
 <div class="section-window archive-window">
-<nav aria-label="아카이브 분류" class="archive-list">
-<p class="archive-kicker">기록 목록</p>
+<div class="archive-index world-index">
+<p class="archive-kicker index-kicker">기록 목록</p>
+<nav aria-label="아카이브 분류" class="archive-list world-tabs">
 <button class="is-active" data-archive-tab="chronicle"><span>一</span><b>연대기</b><small>年代記</small></button>
 <button data-archive-tab="storylog"><span>二</span><b>이야기 기록</b><small>敍事記錄</small></button>
 <button data-archive-tab="people"><span>三</span><b>인물 기록</b><small>人物記錄</small></button>
@@ -3024,6 +3311,7 @@ button{font:inherit}
 <button data-archive-tab="document"><span>五</span><b>문서</b><small>文書</small></button>
 <button data-archive-tab="gallery"><span>六</span><b>화첩</b><small>畫帖</small></button>
 </nav>
+</div>
 <div class="archive-paper">
 <div class="archive-mark">天上痕 · 記錄</div>
 <div class="archive-pane is-active" data-archive-pane="chronicle"><div class="archive-pane-head"><span>第一卷</span><h3>연대기</h3></div><p>러닝 중 일어난 주요 사건과 결과를 날짜 또는 장 단위로 기록하는 공간.</p><small>아직 기록이 없습니다.</small></div>
