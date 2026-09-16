@@ -4567,13 +4567,13 @@ if (window.dat && dat.GUI) {
   </div>
 </div>
 
-<script src="./r2-config.js"></script>
-<script src="./site-mode.js"></script>
+<script src="./r2-config.js?v=63.2"></script>
+<script src="./site-mode.js?v=63.2"></script>
 <script>
 (()=>{
   const useFirebase=window.CHEONSANGHEUN_USE_FIREBASE===true;
   const sc=document.createElement('script');
-  sc.src=useFirebase?'./cms.js':'./demo.js';
+  sc.src=useFirebase?'./cms.js?v=63.2':'./demo.js?v=63.2';
   if(useFirebase) sc.type='module';
   document.body.appendChild(sc);
 })();

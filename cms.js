@@ -1,7 +1,7 @@
 
 import { firebaseConfig, ADMIN_UID } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, setDoc, query, where, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -24,7 +24,56 @@ let editingScenes=[], editingEpisodeId=null, editingSceneIndex=-1;
 let currentArchiveId=null;
 let archiveReplayScenes=[], archiveReplayIndex=0;
 let localPreviewDataUrl='';
-\n/* ---------- R2 MEDIA UPLOADER ---------- */\nfunction r2Config(){return window.CHEONSANGHEUN_R2||{}}\nfunction r2Ready(){const c=r2Config();return !!(c.enabled&&c.endpoint&&!String(c.endpoint).includes('PASTE_'))}\nfunction r2Endpoint(){return String(r2Config().endpoint||'').replace(/\/$/,'')}\nfunction dispatchInput(el){el?.dispatchEvent(new Event('input',{bubbles:true}));el?.dispatchEvent(new Event('change',{bubbles:true}))}\nfunction chooseFile(accept='*/*'){return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.style.display='none';document.body.appendChild(input);input.addEventListener('change',()=>{const f=input.files?.[0]||null;input.remove();resolve(f)},{once:true});input.addEventListener('cancel',()=>{input.remove();resolve(null)},{once:true});input.click()})}\nasync function uploadR2File(file,kind,button){\n  if(!admin||!currentUser)throw new Error('관리자 로그인 후 업로드할 수 있습니다.');\n  if(!r2Ready())throw new Error('R2 Worker가 아직 연결되지 않았습니다. r2-config.js에 Worker 주소를 넣어 주세요.');\n  const maxImage=20*1024*1024,maxAudio=50*1024*1024;\n  if(file.type.startsWith('image/')&&file.size>maxImage)throw new Error('이미지는 20MB 이하만 업로드할 수 있습니다.');\n  if(file.type.startsWith('audio/')&&file.size>maxAudio)throw new Error('사운드는 50MB 이하만 업로드할 수 있습니다.');\n  const old=button?.textContent;if(button){button.classList.add('is-busy');button.textContent='업로드 중…'}\n  try{\n    const token=await currentUser.getIdToken(true);\n    const res=await fetch(`${r2Endpoint()}/upload?kind=${encodeURIComponent(kind||'misc')}`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':file.type||'application/octet-stream','X-File-Name':encodeURIComponent(file.name||'file')},body:file});\n    let data={};try{data=await res.json()}catch{}\n    if(!res.ok)throw new Error(data.error||`업로드 실패 (${res.status})`);\n    if(!data.url)throw new Error('업로드 주소를 받지 못했습니다.');\n    return data;\n  }finally{if(button){button.classList.remove('is-busy');button.textContent=old||'파일 업로드'}}\n}\nasync function removeR2Asset(value){\n  const url=String(value||'').trim();if(!url)return;\n  if(!r2Ready()||!url.startsWith(r2Endpoint()+'/media/'))return;\n  if(!admin||!currentUser)throw new Error('관리자 로그인 후 삭제할 수 있습니다.');\n  const token=await currentUser.getIdToken(true);\n  const res=await fetch(url,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});\n  if(!res.ok){let d={};try{d=await res.json()}catch{}throw new Error(d.error||`저장소 삭제 실패 (${res.status})`)}\n}\ndocument.addEventListener('click',async e=>{\n  const up=e.target.closest('[data-r2-upload]');\n  if(up){\n    e.preventDefault();\n    const target=document.getElementById(up.dataset.r2Target||'');if(!target)return;\n    try{const file=await chooseFile(up.dataset.r2Accept||'*/*');if(!file)return;const data=await uploadR2File(file,up.dataset.r2Kind||'misc',up);target.value=data.url;dispatchInput(target)}\n    catch(err){console.error(err);alert(err.message||'파일 업로드에 실패했습니다.')}\n    return;\n  }\n  const del=e.target.closest('[data-r2-remove]');\n  if(del){\n    e.preventDefault();const target=document.getElementById(del.dataset.r2Target||'');if(!target)return;\n    const value=target.value.trim();if(!value)return;\n    if(!confirm('이 파일 연결을 삭제할까요? R2에 업로드한 파일이면 저장소에서도 삭제됩니다.'))return;\n    const old=del.textContent;del.textContent='삭제 중…';del.disabled=true;\n    try{await removeR2Asset(value);target.value='';dispatchInput(target)}catch(err){console.error(err);alert(err.message||'삭제에 실패했습니다.')}finally{del.textContent=old;del.disabled=false}\n  }\n});\n
+
+/* ---------- R2 MEDIA UPLOADER ---------- */
+function r2Config(){return window.CHEONSANGHEUN_R2||{}}
+function r2Ready(){const c=r2Config();return !!(c.enabled&&c.endpoint&&!String(c.endpoint).includes('PASTE_'))}
+function r2Endpoint(){return String(r2Config().endpoint||'').replace(/\/$/,'')}
+function dispatchInput(el){el?.dispatchEvent(new Event('input',{bubbles:true}));el?.dispatchEvent(new Event('change',{bubbles:true}))}
+function chooseFile(accept='*/*'){return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.style.display='none';document.body.appendChild(input);input.addEventListener('change',()=>{const f=input.files?.[0]||null;input.remove();resolve(f)},{once:true});input.addEventListener('cancel',()=>{input.remove();resolve(null)},{once:true});input.click()})}
+async function uploadR2File(file,kind,button){
+  if(!admin||!currentUser)throw new Error('관리자 로그인 후 업로드할 수 있습니다.');
+  if(!r2Ready())throw new Error('R2 Worker가 아직 연결되지 않았습니다. r2-config.js에 Worker 주소를 넣어 주세요.');
+  const maxImage=20*1024*1024,maxAudio=50*1024*1024;
+  if(file.type.startsWith('image/')&&file.size>maxImage)throw new Error('이미지는 20MB 이하만 업로드할 수 있습니다.');
+  if(file.type.startsWith('audio/')&&file.size>maxAudio)throw new Error('사운드는 50MB 이하만 업로드할 수 있습니다.');
+  const old=button?.textContent;if(button){button.classList.add('is-busy');button.textContent='업로드 중…'}
+  try{
+    const token=await currentUser.getIdToken(true);
+    const res=await fetch(`${r2Endpoint()}/upload?kind=${encodeURIComponent(kind||'misc')}`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':file.type||'application/octet-stream','X-File-Name':encodeURIComponent(file.name||'file')},body:file});
+    let data={};try{data=await res.json()}catch{}
+    if(!res.ok)throw new Error(data.error||`업로드 실패 (${res.status})`);
+    if(!data.url)throw new Error('업로드 주소를 받지 못했습니다.');
+    return data;
+  }finally{if(button){button.classList.remove('is-busy');button.textContent=old||'파일 업로드'}}
+}
+async function removeR2Asset(value){
+  const url=String(value||'').trim();if(!url)return;
+  if(!r2Ready()||!url.startsWith(r2Endpoint()+'/media/'))return;
+  if(!admin||!currentUser)throw new Error('관리자 로그인 후 삭제할 수 있습니다.');
+  const token=await currentUser.getIdToken(true);
+  const res=await fetch(url,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
+  if(!res.ok){let d={};try{d=await res.json()}catch{}throw new Error(d.error||`저장소 삭제 실패 (${res.status})`)}
+}
+document.addEventListener('click',async e=>{
+  const up=e.target.closest('[data-r2-upload]');
+  if(up){
+    e.preventDefault();
+    const target=document.getElementById(up.dataset.r2Target||'');if(!target)return;
+    try{const file=await chooseFile(up.dataset.r2Accept||'*/*');if(!file)return;const data=await uploadR2File(file,up.dataset.r2Kind||'misc',up);target.value=data.url;dispatchInput(target)}
+    catch(err){console.error(err);alert(err.message||'파일 업로드에 실패했습니다.')}
+    return;
+  }
+  const del=e.target.closest('[data-r2-remove]');
+  if(del){
+    e.preventDefault();const target=document.getElementById(del.dataset.r2Target||'');if(!target)return;
+    const value=target.value.trim();if(!value)return;
+    if(!confirm('이 파일 연결을 삭제할까요? R2에 업로드한 파일이면 저장소에서도 삭제됩니다.'))return;
+    const old=del.textContent;del.textContent='삭제 중…';del.disabled=true;
+    try{await removeR2Asset(value);target.value='';dispatchInput(target)}catch(err){console.error(err);alert(err.message||'삭제에 실패했습니다.')}finally{del.textContent=old;del.disabled=false}
+  }
+});
+
 const vnAudio={muted:true,bgm:new Audio(),amb:new Audio(),se:new Audio(),bgmUrl:'',ambUrl:'',episodeId:''};
 vnAudio.bgm.loop=true;vnAudio.amb.loop=true;vnAudio.bgm.volume=.55;vnAudio.amb.volume=.42;vnAudio.se.volume=.75;
 const replayAudio={muted:false,bgm:new Audio(),amb:new Audio(),se:new Audio(),bgmUrl:'',ambUrl:''};
@@ -387,6 +436,7 @@ async function start(){
    return;
  }
  const app=initializeApp(firebaseConfig);auth=getAuth(app);db=getFirestore(app);
+ await setPersistence(auth,browserLocalPersistence);
  onAuthStateChanged(auth,async user=>{
    currentUser=user;admin=!!(user&&user.uid===ADMIN_UID);
    if(editRequested&&!admin){location.href='./admin.html';return}
