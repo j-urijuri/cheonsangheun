@@ -4703,7 +4703,7 @@ if (window.dat && dat.GUI) {
 
 <div aria-hidden="true" class="cms-editor-shade" id="pairEditorShade">
   <div class="cms-paper pair-editor-paper">
-    <div class="cms-paper-head"><div><small>PAIR PROFILE EDITOR · 10 PAIRS</small><h3 id="pairEditorHeading">페어 프로필 편집</h3></div><button class="cms-close" id="pairEditorClose">×</button></div><p class="r2-connection-note">R2 연결 후 이미지 업로드 버튼을 누르면 주소가 자동 입력됩니다. 연결 전에는 기존처럼 URL을 직접 입력할 수 있습니다.</p>
+    <div class="cms-paper-head"><div><small>PAIR PROFILE EDITOR · 10 PAIRS</small><h3 id="pairEditorHeading">페어 프로필 편집</h3></div><button class="cms-close" id="pairEditorClose">×</button></div><p class="r2-connection-note">Cloudinary 연결 후 이미지 업로드 버튼을 누르면 주소가 자동 입력됩니다. 기존처럼 URL을 직접 입력할 수도 있습니다.</p>
     <div class="cms-form-grid">
       <div class="cms-field"><label>페어 선택</label><select id="pairEditorKey">
         <option value="pair01">PAIR 01</option><option value="pair02">PAIR 02</option><option value="pair03">PAIR 03</option><option value="pair04">PAIR 04</option><option value="pair05">PAIR 05</option><option value="pair06">PAIR 06</option><option value="pair07">PAIR 07</option><option value="pair08">PAIR 08</option><option value="pair09">PAIR 09</option><option value="pair10">PAIR 10</option>
@@ -4711,7 +4711,7 @@ if (window.dat && dat.GUI) {
       <div class="cms-field"><label>페어 제목</label><input id="pairTitleInput" placeholder="페어 01"/></div>
       <div class="cms-field"><label>부제 / 관계 문구</label><input id="pairSubtitleInput" placeholder="페어 기록"/></div>
     </div>
-    <div class="cms-field"><label>페어 카드 대표 이미지 · 선택</label><div class="r2-field-row"><input id="pairPreviewInput" placeholder="호버 목록에서 보일 합본/대표 이미지"/><button class="r2-upload-btn" type="button" data-r2-upload data-r2-target="pairPreviewInput" data-r2-kind="characters" data-r2-accept="image/*">이미지 업로드</button><button class="r2-remove-btn" type="button" data-r2-remove data-r2-target="pairPreviewInput">삭제</button></div><p class="pair-editor-topnote">직접 URL을 붙여넣거나 R2에 파일을 업로드할 수 있습니다.</p><div class="pair-editor-image-preview pair-editor-card-preview" id="pairCardPreview">PAIR CARD PREVIEW</div></div>
+    <div class="cms-field"><label>페어 카드 대표 이미지 · 선택</label><div class="r2-field-row"><input id="pairPreviewInput" placeholder="호버 목록에서 보일 합본/대표 이미지"/><button class="r2-upload-btn" type="button" data-r2-upload data-r2-target="pairPreviewInput" data-r2-kind="characters" data-r2-accept="image/*">이미지 업로드</button><button class="r2-remove-btn" type="button" data-r2-remove data-r2-target="pairPreviewInput">삭제</button></div><p class="pair-editor-topnote">직접 URL을 붙여넣거나 Cloudinary에 파일을 업로드할 수 있습니다.</p><div class="pair-editor-image-preview pair-editor-card-preview" id="pairCardPreview">PAIR CARD PREVIEW</div></div>
     <div class="pair-editor-grid">
       <section class="pair-editor-side" data-pair-side="left"><h4>左 · 첫 번째 인물</h4>
         <div class="cms-field"><label>전신 이미지</label><div class="r2-field-row"><input id="pairLeftImage" placeholder="https://... 또는 업로드"/><button class="r2-upload-btn" type="button" data-r2-upload data-r2-target="pairLeftImage" data-r2-kind="characters" data-r2-accept="image/*">파일 업로드</button><button class="r2-remove-btn" type="button" data-r2-remove data-r2-target="pairLeftImage">삭제</button></div></div>
@@ -4746,13 +4746,13 @@ if (window.dat && dat.GUI) {
   </div>
 </div>
 
-<script src="./r2-config.js?v=63.2"></script>
+<script src="./media-config.js?v=65.4"></script>
 <script src="./site-mode.js?v=63.2"></script>
 <script>
 (()=>{
   const useFirebase=window.CHEONSANGHEUN_USE_FIREBASE===true;
   const sc=document.createElement('script');
-  sc.src=useFirebase?'./cms.js?v=65.3':'./demo.js?v=64.0';
+  sc.src=useFirebase?'./cms.js?v=65.4':'./demo.js?v=64.0';
   if(useFirebase) sc.type='module';
   document.body.appendChild(sc);
 })();

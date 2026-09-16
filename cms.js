@@ -30,42 +30,85 @@ let currentArchiveId=null;
 let archiveReplayScenes=[], archiveReplayIndex=0;
 let localPreviewDataUrl='';
 
-/* ---------- R2 MEDIA UPLOADER ---------- */
-function r2Config(){return window.CHEONSANGHEUN_R2||{}}
-function r2Ready(){const c=r2Config();return !!(c.enabled&&c.endpoint&&!String(c.endpoint).includes('PASTE_'))}
-function r2Endpoint(){return String(r2Config().endpoint||'').replace(/\/$/,'')}
+/* ---------- CLOUDINARY MEDIA UPLOADER ---------- */
+function mediaConfig(){return window.CHEONSANGHEUN_MEDIA||{}}
+function mediaReady(){const c=mediaConfig();return !!(c.enabled&&c.endpoint&&!String(c.endpoint).includes('PASTE_'))}
+function mediaEndpoint(){return String(mediaConfig().endpoint||'').replace(/\/$/,'')}
 function dispatchInput(el){el?.dispatchEvent(new Event('input',{bubbles:true}));el?.dispatchEvent(new Event('change',{bubbles:true}))}
 function chooseFile(accept='*/*'){return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.style.display='none';document.body.appendChild(input);input.addEventListener('change',()=>{const f=input.files?.[0]||null;input.remove();resolve(f)},{once:true});input.addEventListener('cancel',()=>{input.remove();resolve(null)},{once:true});input.click()})}
-async function uploadR2File(file,kind,button){
+
+async function uploadMediaFile(file,kind,button){
   if(!isEditorMode()||!currentUser)throw new Error('관리자 편집 모드에서만 업로드할 수 있습니다.');
-  if(!r2Ready())throw new Error('R2 Worker가 아직 연결되지 않았습니다. r2-config.js에 Worker 주소를 넣어 주세요.');
+  if(!mediaReady())throw new Error('파일 업로드 서버가 아직 연결되지 않았습니다.');
   const maxImage=20*1024*1024,maxAudio=50*1024*1024;
   if(file.type.startsWith('image/')&&file.size>maxImage)throw new Error('이미지는 20MB 이하만 업로드할 수 있습니다.');
   if(file.type.startsWith('audio/')&&file.size>maxAudio)throw new Error('사운드는 50MB 이하만 업로드할 수 있습니다.');
   const old=button?.textContent;if(button){button.classList.add('is-busy');button.textContent='업로드 중…'}
   try{
     const token=await currentUser.getIdToken(true);
-    const res=await fetch(`${r2Endpoint()}/upload?kind=${encodeURIComponent(kind||'misc')}`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':file.type||'application/octet-stream','X-File-Name':encodeURIComponent(file.name||'file')},body:file});
-    let data={};try{data=await res.json()}catch{}
-    if(!res.ok)throw new Error(data.error||`업로드 실패 (${res.status})`);
-    if(!data.url)throw new Error('업로드 주소를 받지 못했습니다.');
-    return data;
+    const signRes=await fetch(`${mediaEndpoint()}/sign-upload`,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body:JSON.stringify({folder:kind||'misc'})
+    });
+    let sign={};try{sign=await signRes.json()}catch{}
+    if(!signRes.ok)throw new Error(sign.error||`업로드 서명 발급 실패 (${signRes.status})`);
+    if(!sign.uploadUrl||!sign.signature||!sign.apiKey||!sign.timestamp||!sign.publicId)throw new Error('업로드 서버 응답이 올바르지 않습니다.');
+
+    const form=new FormData();
+    form.append('file',file,file.name||'file');
+    form.append('api_key',sign.apiKey);
+    form.append('timestamp',String(sign.timestamp));
+    form.append('signature',sign.signature);
+    form.append('public_id',sign.publicId);
+
+    const uploadRes=await fetch(sign.uploadUrl,{method:'POST',body:form});
+    let data={};try{data=await uploadRes.json()}catch{}
+    if(!uploadRes.ok)throw new Error(data?.error?.message||data?.error||`Cloudinary 업로드 실패 (${uploadRes.status})`);
+    if(!data.secure_url)throw new Error('업로드 주소를 받지 못했습니다.');
+    return {url:data.secure_url,publicId:data.public_id||sign.publicId,resourceType:data.resource_type||''};
   }finally{if(button){button.classList.remove('is-busy');button.textContent=old||'파일 업로드'}}
 }
-async function removeR2Asset(value){
-  const url=String(value||'').trim();if(!url)return;
-  if(!r2Ready()||!url.startsWith(r2Endpoint()+'/media/'))return;
+
+function parseCloudinaryAsset(value){
+  const raw=String(value||'').trim();if(!raw)return null;
+  let u;try{u=new URL(raw)}catch{return null}
+  if(u.hostname!=='res.cloudinary.com')return null;
+  const parts=u.pathname.split('/').filter(Boolean).map(x=>{try{return decodeURIComponent(x)}catch{return x}});
+  const cloudName=String(mediaConfig().cloudName||'').trim();
+  if(parts.length<4||(cloudName&&parts[0]!==cloudName))return null;
+  const uploadIndex=parts.indexOf('upload');if(uploadIndex<1)return null;
+  const resourceType=parts[uploadIndex-1];
+  if(!['image','video','raw'].includes(resourceType))return null;
+  let tail=parts.slice(uploadIndex+1);
+  const versionIndex=tail.findIndex(x=>/^v\d+$/.test(x));
+  if(versionIndex>=0)tail=tail.slice(versionIndex+1);
+  if(!tail.length)return null;
+  let publicId=tail.join('/');
+  if(resourceType==='image'||resourceType==='video')publicId=publicId.replace(/\.[^/.]+$/,'');
+  return publicId?{publicId,resourceType}:null;
+}
+
+async function removeMediaAsset(value){
+  const asset=parseCloudinaryAsset(value);if(!asset)return;
+  if(!mediaReady())return;
   if(!isEditorMode()||!currentUser)throw new Error('관리자 편집 모드에서만 삭제할 수 있습니다.');
   const token=await currentUser.getIdToken(true);
-  const res=await fetch(url,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
-  if(!res.ok){let d={};try{d=await res.json()}catch{}throw new Error(d.error||`저장소 삭제 실패 (${res.status})`)}
+  const res=await fetch(`${mediaEndpoint()}/delete`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({public_id:asset.publicId,resource_type:asset.resourceType})
+  });
+  let data={};try{data=await res.json()}catch{}
+  if(!res.ok)throw new Error(data.error||`저장소 삭제 실패 (${res.status})`);
 }
+
 document.addEventListener('click',async e=>{
   const up=e.target.closest('[data-r2-upload]');
   if(up){
     e.preventDefault();
     const target=document.getElementById(up.dataset.r2Target||'');if(!target)return;
-    try{const file=await chooseFile(up.dataset.r2Accept||'*/*');if(!file)return;const data=await uploadR2File(file,up.dataset.r2Kind||'misc',up);target.value=data.url;dispatchInput(target)}
+    try{const file=await chooseFile(up.dataset.r2Accept||'*/*');if(!file)return;const data=await uploadMediaFile(file,up.dataset.r2Kind||'misc',up);target.value=data.url;dispatchInput(target)}
     catch(err){console.error(err);alert(err.message||'파일 업로드에 실패했습니다.')}
     return;
   }
@@ -73,9 +116,9 @@ document.addEventListener('click',async e=>{
   if(del){
     e.preventDefault();const target=document.getElementById(del.dataset.r2Target||'');if(!target)return;
     const value=target.value.trim();if(!value)return;
-    if(!confirm('이 파일 연결을 삭제할까요? R2에 업로드한 파일이면 저장소에서도 삭제됩니다.'))return;
+    if(!confirm('이 파일 연결을 삭제할까요? Cloudinary에 업로드한 파일이면 저장소에서도 삭제됩니다.'))return;
     const old=del.textContent;del.textContent='삭제 중…';del.disabled=true;
-    try{await removeR2Asset(value);target.value='';dispatchInput(target)}catch(err){console.error(err);alert(err.message||'삭제에 실패했습니다.')}finally{del.textContent=old;del.disabled=false}
+    try{await removeMediaAsset(value);target.value='';dispatchInput(target)}catch(err){console.error(err);alert(err.message||'삭제에 실패했습니다.')}finally{del.textContent=old;del.disabled=false}
   }
 });
 
