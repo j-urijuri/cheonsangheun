@@ -77,6 +77,12 @@ button{font:inherit}
 .realm-list section{padding:18px 18px 16px;border:1px solid rgba(31,27,23,.14);background:rgba(255,255,255,.52)}
 .realm-list b{display:block;font-family:var(--title);font-weight:400;font-size:17px;margin-bottom:8px}
 .realm-list p{font-size:12px;line-height:1.78;margin:0;color:#5a514a}
+.ascension-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:22px 0 16px}
+.ascension-steps section{padding:14px 13px;border:1px solid rgba(30,25,21,.14);background:rgba(255,255,255,.5)}
+.ascension-steps span{display:block;font-size:9px;letter-spacing:.2em;color:#8a8179;margin-bottom:7px}
+.ascension-steps b{display:block;font-family:var(--title);font-size:16px;font-weight:400;margin-bottom:7px}
+.ascension-steps p{font-size:11px;line-height:1.65;margin:0;color:#5a514a}
+.ascension-note{padding:14px 16px;border:1px solid rgba(30,25,21,.14);background:rgba(255,255,255,.5)}
 .trial-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:20px 0 14px}
 .trial-grid button,.race-card{border:1px solid rgba(30,25,21,.15);background:rgba(255,255,255,.58);color:#29231f;padding:12px 8px;cursor:pointer;transition:.15s}
 .trial-grid button:hover,.race-card:hover,.race-card.is-active{background:#e9e3d9}
@@ -84,7 +90,7 @@ button{font:inherit}
 .trial-grid span,.race-card span{display:block;margin-top:5px;font-size:10px;color:#756d65}
 .trial-output{border:1px solid rgba(30,25,21,.15);background:rgba(255,255,255,.58);padding:14px 16px;font-size:12px;line-height:1.8;color:#4f4740}
 .world-pane blockquote{margin:22px 0;padding:15px 18px;border-left:2px solid #4c433c;background:rgba(255,255,255,.5);font-size:13px;line-height:1.9;color:#413a34}
-.race-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.race-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
 .race-detail{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .race-detail p{margin:0;padding:14px;border:1px solid rgba(30,25,21,.14);background:rgba(255,255,255,.5);font-size:12px;line-height:1.75}
 .race-detail strong{display:block;margin-bottom:6px;font-family:var(--title);font-size:15px;font-weight:400;color:#211c18}
@@ -174,6 +180,7 @@ button{font:inherit}
   .race-detail{grid-template-columns:1fr}
 }
 @media(max-width:860px){
+  .ascension-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
   .rail{right:14px}
   .content-shell{padding:5vh 8vw 78px 5vw}
   .title-story,.title-world,.title-character,.title-archive{width:min(430px,70vw)}
@@ -189,6 +196,7 @@ button{font:inherit}
   .archive-ledger{grid-template-columns:260px minmax(0,1fr)}
 }
 @media(max-width:640px){
+  .ascension-steps{grid-template-columns:1fr}
   .rail{left:0;right:0;top:auto;bottom:0;transform:none;flex-direction:row;justify-content:space-around;padding:10px 8px;background:rgba(10,9,8,.88);backdrop-filter:blur(10px)}
   .rail-line{display:none}
   .rail button{writing-mode:initial;font-size:11px;letter-spacing:.04em}
@@ -3086,6 +3094,63 @@ button{font:inherit}
   .world .world-tabs button{margin:0!important}
 }
 
+
+/* ===== v46 trial system ===== */
+.world .trial-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+.world .trial-output{
+  min-height:188px!important;
+}
+.world .trial-output-head{
+  display:grid;
+  grid-template-columns:auto auto 1fr;
+  align-items:baseline;
+  gap:8px;
+  margin:0 0 12px;
+}
+.world .trial-output-head b{
+  font-family:var(--title);
+  font-size:19px;
+  font-weight:400;
+  letter-spacing:.06em;
+  color:#30261f;
+}
+.world .trial-output-head span{
+  font-family:var(--title);
+  font-size:13px;
+  color:#4b3d33;
+}
+.world .trial-output-head small{
+  justify-self:end;
+  font-size:9px;
+  letter-spacing:.12em;
+  color:rgba(65,50,39,.48);
+}
+.world .trial-output p{
+  margin:8px 0 0!important;
+}
+.world .trial-output .trial-example{
+  color:rgba(72,58,49,.76)!important;
+}
+.world .trial-output .trial-core{
+  margin-top:12px!important;
+  padding-top:10px!important;
+  border-top:1px solid rgba(74,58,46,.12)!important;
+  font-family:var(--title);
+  color:#342920!important;
+}
+.world .trial-major-note{
+  margin-top:13px!important;
+  font-size:11px!important;
+  color:rgba(68,53,42,.66)!important;
+}
+@media(max-width:720px){
+  .world .trial-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .world .trial-output-head{grid-template-columns:auto 1fr}
+  .world .trial-output-head small{grid-column:1/-1;justify-self:start}
+}
+
 </style>
 </head>
 <body>
@@ -3139,49 +3204,54 @@ button{font:inherit}
 <article class="world-pane is-active" data-world-pane="realm">
 <div class="pane-head"><span>01</span><h3>삼계 三界</h3></div>
 <p>세상은 <b>인간계 人界, 선계 仙界, 요계 妖界</b>의 세 영역으로 나뉜다. 세 계는 완전히 단절된 세계가 아니라 서로 맞닿아 있으며, 특정한 장소나 시기에는 경계가 흐려지기도 한다.</p>
-<p>삼계의 구분과 종족은 반드시 일치하지 않는다. 인족은 수행을 통해 선계에 오를 수 있고, 요족과 영족 역시 선격을 얻어 선계에 들어갈 수 있다. 용족은 오래전부터 삼계의 강과 바다, 하늘의 수로를 오가며 살아왔다.</p>
+<p>삼계의 구분과 종족은 반드시 일치하지 않는다. 인족은 수행을 통해 선계에 오를 수 있고, 요족 역시 선격을 얻어 선계에 들어갈 수 있다. 용족도 수행과 천겁을 거쳐 선계의 지위를 얻을 수 있다.</p>
 <div class="realm-list">
 <section><b>인간계 人界</b><p>생명의 흐름이 가장 빠르고 변화가 많은 세계. 인족은 짧은 생과 약한 힘 대신 자신의 선택으로 삶의 방향을 크게 바꿀 수 있다.</p></section>
 <section><b>선계 仙界</b><p>선족과 선인, 신격을 지닌 존재들의 세계. 선악보다 질서와 천명의 유지가 우선된다.</p></section>
-<section><b>요계 妖界</b><p>요족, 영족, 신수와 잊힌 존재들이 살아가는 세계. 본성과 욕망, 오래된 약속과 인연을 중시한다.</p></section>
+<section><b>요계 妖界</b><p>요족과 신수 등이 살아가는 세계. 본성과 욕망, 오래된 약속과 인연을 중시한다.</p></section>
 </div>
 </article>
 <article class="world-pane" data-world-pane="ascension" hidden="">
 <div class="pane-head"><span>02</span><h3>선족과 선인 · 수행과 승선</h3></div>
-<p><b>선족 仙族</b>과 <b>선인 仙人</b>은 같은 의미가 아니다. 선족은 선계의 기운 속에서 태어나 선기를 타고난 종족이며, 선인은 <b>선격 仙格을 얻어 선계의 존재로 인정받은 자</b>를 뜻한다.</p>
-<p>삼계의 존재들은 수행으로 타고난 한계를 넘어설 수 있다. 일정한 경지에 도달해 선격을 인정받고 선계에 오르는 것을 <b>승선 昇仙</b>이라 한다. 인족뿐 아니라 요족과 영족도 선격을 얻을 수 있고, 극히 드물게 용족도 새로운 천명을 받아 선계의 지위에 오르기도 한다.</p>
-<p>이미 선계에 속한 선족에게는 일반적으로 승선이라는 표현을 쓰지 않는다. 대신 더 높은 선격이나 새로운 천명을 받아 존재의 격을 높인다.</p>
+<p><b>선족 仙族</b>과 <b>선인 仙人</b>은 같은 의미가 아니다. 선족은 선계에서 태어나 선기를 타고난 종족이며, 선인은 출신 종족과 관계없이 <b>선격 仙格을 얻어 선계의 존재로 인정받은 자</b>를 뜻한다.</p>
+<p>삼계의 존재들은 수행으로 타고난 한계를 넘어설 수 있다. 일정한 경지에 도달한 뒤 천겁을 지나 선격을 인정받고 선계에 오르는 것을 <b>승선 昇仙</b>이라 한다. 인족뿐 아니라 요족도 선격을 얻을 수 있으며, 용족 역시 선계의 지위를 얻을 수 있다.</p>
+<div class="ascension-steps">
+<section><span>一</span><b>수행 修行</b><p>자신의 도와 힘을 닦아 선격에 이를 기반을 쌓는 시기.</p></section>
+<section><span>二</span><b>도겁 渡劫</b><p>승선을 앞두고 천겁을 겪는 과정. 어떤 천겁이 닥칠지는 미리 알 수 없으며, 뢰겁·심겁·정겁·망겁 등 서로 다른 겁이 찾아올 수 있다.</p></section>
+<section><span>三</span><b>승선 · 선인 昇仙 · 仙人</b><p>천겁을 지나 선격을 인정받고 처음 선계의 존재가 된 단계.</p></section>
+<section><span>四</span><b>상선 上仙</b><p>승선 이후 다시 수행하고 겁을 지나 더 높은 선격에 오른 존재.</p></section>
+<section><span>五</span><b>상신 上神</b><p>매우 높은 선격과 권능을 지닌 존재. 상신이 된 뒤에도 천겁에서 완전히 벗어나지는 않는다.</p></section>
+</div>
+<p class="ascension-note"><b>도겁 渡劫.</b> 승선을 앞두고 어떤 천겁을 겪게 될지는 정해져 있지 않다. 같은 존재라도 시기와 삶에 따라 전혀 다른 겁을 맞을 수 있다.</p>
+<p>선족은 태어날 때부터 선계에 속하기 때문에 일반적으로 ‘승선’이라는 표현을 쓰지 않는다. 그러나 출생과 선격의 높이는 별개이므로 수행과 천겁을 거쳐 상선·상신으로 격을 높일 수 있다. <b>상신 또한 새로운 천명, 권능의 변화, 오래된 인연과 맹세, 삼계의 질서 변화 등 여러 이유로 다시 천겁을 겪을 수 있다.</b></p>
 </article>
 <article class="world-pane" data-world-pane="trial" hidden="">
 <div class="pane-head"><span>03</span><h3>천겁 天劫</h3></div>
-<p>천겁은 단순한 형벌이나 힘의 시험이 아니다. <b>존재가 자신의 본래 자리와 한계를 넘어 천명에 가까워질 때 발생하는 겁</b>에 가깝다. 같은 이름의 천겁도 겪는 존재에 따라 전혀 다른 모습으로 나타난다.</p>
+<p>천겁은 수행과 승선, 격의 상승처럼 <b>한 존재의 경계가 크게 흔들리는 때 찾아오는 시련</b>이다. 특정 종족만의 것이 아니며 인족·선족·요족·용족 모두가 겪을 수 있다. 같은 겁이라도 당사자의 삶과 수행에 따라 형태와 강도는 달라진다.</p>
+<p>천겁은 현실의 사건으로만 나타나지 않는다. 천뢰와 같은 자연현상, 환영과 심마, 인간계에서 보내는 한 생, 기억의 상실처럼 서로 다른 방식으로 발현될 수 있다. 중요한 것은 겁이 어떤 모습인가보다 <b>무엇을 겪게 하는가</b>이다. 선인·상선뿐 아니라 상신에게도 천겁은 다시 찾아올 수 있으며, 그 이유 역시 하나로 정해져 있지 않다.</p>
 <div class="trial-grid">
 <button data-trial="뢰겁"><b>雷劫</b><span>뢰겁</span></button>
-<button data-trial="몽겁"><b>夢劫</b><span>몽겁</span></button>
-<button data-trial="업겁"><b>業劫</b><span>업겁</span></button>
-<button data-trial="혈겁"><b>血劫</b><span>혈겁</span></button>
 <button data-trial="심겁"><b>心劫</b><span>심겁</span></button>
 <button data-trial="정겁"><b>情劫</b><span>정겁</span></button>
 <button data-trial="망겁"><b>忘劫</b><span>망겁</span></button>
-<button data-trial="명겁"><b>命劫</b><span>명겁</span></button>
-<button data-trial="참연겁"><b>斬緣劫</b><span>참연겁</span></button>
 </div>
-<div class="trial-output" id="trialOutput">천겁을 선택하면 설명이 표시됩니다.</div>
+<div class="trial-output" id="trialOutput">천겁을 선택하면 설명과 예시, 핵심 질문이 표시됩니다.</div>
+<p class="trial-major-note"><b>참연겁 斬緣劫</b>은 일반적인 천겁과 나란히 분류하지 않는다. 삼계에서 가장 두려운 대겁으로 여겨지며 별도로 기록한다.</p>
 </article>
 <article class="world-pane" data-world-pane="fate" hidden="">
 <div class="pane-head"><span>04</span><h3>참연겁 斬緣劫</h3></div>
-<p>승선이나 격의 상승을 앞둔 존재에게 <b>현재의 자신을 붙잡고 있는 인연이 천명과 충돌할 정도로 깊을 때</b> 나타난다고 알려져 있다.</p>
-<p>가족, 벗, 스승, 제자, 연인뿐 아니라 태어난 장소, 오랜 세월 지켜온 영역, 혈족과 맹약처럼 존재의 일부가 된 연결도 하나의 ‘연 緣’으로 간주될 수 있다.</p>
-<blockquote>천겁은 선인이 될 자격을 시험하는 것이 아니라, 한 존재에게서 천명을 흔들 수 있는 것들을 하나씩 떼어내는 과정이라는 이야기도 전해진다.</blockquote>
-<p>선계에서는 이를 깨달음이라 부르지만, 요계에서는 하늘이 한 존재를 자신에게 복종하도록 길들이는 과정이라고 말한다. 어느 쪽이 진실인지는 명확하지 않다.</p>
+<p><b>참연겁은 삼계에서 가장 큰 겁으로 여겨지는 대겁이다.</b> 다른 천겁을 지나온 존재에게도 닥칠 수 있으며, 자신을 현세에 가장 깊게 묶어 두고 있는 인연 자체가 천명과 충돌할 때 나타난다고 전해진다.</p>
+<p>참연겁을 받아들이면 특정 상대와의 인연이 끊어진다. 그 상대에 대한 <b>기억과 감정이 모두 사라지며</b>, 사랑, 미움, 그리움, 미련처럼 그 사람을 향하던 감정 역시 남지 않는다.</p>
+<p>참연겁을 받아들인 뒤에는 그 상대와 함께했던 일, 나누었던 약속, 상대를 사랑하거나 미워했던 이유까지 더 이상 기억하지 못한다. 인연이 있었다는 사실 자체가 사라진 것처럼, 그 사람을 향해 남아 있던 감정 또한 함께 없어진다.</p>
+<blockquote><b>핵심 질문</b> — 참연겁을 받아들이고, 자신을 가장 깊게 붙들어 온 상대와의 기억과 감정까지 모두 놓을 수 있는가.</blockquote>
 </article>
 <article class="world-pane" data-world-pane="race" hidden="">
 <div class="pane-head"><span>05</span><h3>종족</h3></div>
+<p><b>외관 원칙.</b> 종족에 관계없이 기본적인 모습은 인간형이다. 요족이나 용족은 뿔·날개·귀·꼬리·몸 일부의 비늘이나 깃털처럼 일부 비인간적 특징을 가질 수 있지만, 한 인물에게 여러 특징이 과도하게 겹치지는 않는다. 지나치게 이질적인 동공이나 인간형을 크게 벗어나는 외형은 사용하지 않는다.</p>
 <div class="race-grid">
 <button class="race-card is-active" data-race="human"><b>인족 人族</b><span>선택과 가능성</span></button>
 <button class="race-card" data-race="celestial"><b>선족 仙族</b><span>질서와 천명</span></button>
 <button class="race-card" data-race="yao"><b>요족 妖族</b><span>본성과 인연</span></button>
-<button class="race-card" data-race="spirit"><b>영족 靈族</b><span>자연과 근원</span></button>
 <button class="race-card" data-race="dragon"><b>용족 龍族</b><span>혈통과 오래된 약속</span></button>
 </div>
 <div class="race-detail" id="raceDetail"></div>
@@ -3344,25 +3414,47 @@ worldTabs.forEach(btn=>btn.addEventListener('click',()=>{
 }));
 
 const trials={
-  '뢰겁':'하늘의 벼락이 육신과 영맥을 태우는 가장 직접적인 천겁이다.',
-  '몽겁':'가장 두려워했던 기억과 후회 속에 가두어 현실과 꿈을 구별하지 못하게 한다.',
-  '업겁':'과거 자신의 선택이 만들어낸 결과와 다시 마주하게 한다. 선의로 행한 일이 남긴 비극도 피할 수 없다.',
-  '혈겁':'자신의 손으로 죽였거나 끝내 구하지 못했던 존재들의 원한과 마주하게 되는 겁이다.',
-  '심겁':'가장 간절하게 바라던 것을 현실처럼 보여주어 마음 깊은 곳의 욕망을 건드린다.',
-  '정겁':'사랑과 애착에서 비롯되는 겁. 사랑 자체가 겁이 되거나 포기와 보호 사이의 선택을 요구한다.',
-  '망겁':'가장 소중한 존재의 이름과 얼굴, 목소리, 함께한 시간과 사랑했던 이유까지 하나씩 지워 간다.',
-  '명겁':'자신의 목숨과 타인의 목숨을 천명에 얽어 무엇을 자신의 운명으로 받아들일지 선택하게 한다.',
-  '참연겁':'현재의 자신을 붙잡고 있는 인연이 천명과 충돌할 정도로 깊을 때 나타난다. 사람뿐 아니라 장소, 혈족, 영역, 맹약도 하나의 연으로 간주될 수 있다.'
+  '뢰겁':{
+    hanja:'雷劫',
+    title:'육신과 수행을 치는 겁',
+    body:'천뢰가 직접 육신과 영맥에 내려치는 가장 물리적인 천겁이다. 수행이나 승선으로 얻게 될 힘을 현재의 육체가 받아낼 수 있는지를 시험한다. 견디지 못하면 중상을 입거나 수행을 잃고, 승선이나 격의 상승이 좌절될 수도 있다.',
+    example:'예시 — 선격을 얻기 직전의 요족에게 여러 차례 천뢰가 내린다. 기맥이 끊기고 본래의 형상으로 되돌아가더라도 마지막 천뢰까지 버텨야 겁을 넘을 수 있다.',
+    question:'핵심 질문 — 지금의 자신이 이 힘을 받아낼 수 있는가.'
+  },
+  '심겁':{
+    hanja:'心劫',
+    title:'자신의 심마와 마주하는 겁',
+    body:'욕망, 공포, 후회, 죄책감, 오만처럼 당사자 안에서 오래 자라난 심마가 겁의 형태로 나타난다. 타인과 맺은 정 자체가 원인인 정겁과 달리, 그 타인이 존재하지 않아도 심겁은 일어날 수 있다. 실제와 구별하기 어려운 환영이나 왜곡된 상황으로 발현되는 경우가 많다.',
+    example:'예시 — 권력을 갈망하던 자가 무엇이든 명령할 수 있는 세계에 갇히거나, 버림받는 일을 가장 두려워하던 자가 모두에게 외면받는 환영 속에서 스스로 무너질 수 있다.',
+    question:'핵심 질문 — 자신 안에서 가장 떨쳐내지 못한 것에 삼켜지지 않을 수 있는가.'
+  },
+  '정겁':{
+    hanja:'情劫',
+    title:'정을 겪는 겁',
+    body:'사랑, 연모, 가족애, 우정, 사제의 정처럼 타자와 깊은 정을 맺고, 그 정에서 비롯되는 기쁨과 집착, 갈등과 상실, 선택을 직접 겪게 되는 천겁이다. 한 생 안에서 끝날 수도 있고, 여러 생에 걸쳐 거듭 환생하며 같은 인연 또는 서로 다른 관계로 다시 만나 정을 겪을 수도 있다.',
+    example:'예시 — 인간계에서 한 생을 살아가며 깊은 정을 맺는 삶 전체가 정겁이 될 수 있고, 여러 번 환생하여 매 생 다른 신분과 관계로 다시 만나 정을 겪는 경우도 있다. 본래의 삶에서 한 인연과 오랜 세월 관계를 이어가는 과정 자체가 정겁이 되기도 한다.',
+    question:'핵심 질문 — 누군가와 깊은 정을 맺고 그로 인해 생기는 모든 것을 끝까지 감당할 수 있는가.'
+  },
+  '망겁':{
+    hanja:'忘劫',
+    title:'소중한 기억 하나를 잃는 겁',
+    body:'망겁을 받아들이면 무엇을 잃게 될지 알지 못한 채 자신에게 가장 소중한 기억 하나를 잃는다. 어떤 기억을 잃을지는 스스로 선택할 수 없다.',
+    example:'승선을 앞둔 도겁에서 망겁이 닥칠 수도 있다. 이 경우에도 무엇을 잃게 될지는 미리 알 수 없으며, 망겁은 여러 천겁 가운데 하나일 뿐 승선 때 반드시 찾아오는 겁은 아니다.',
+    question:'핵심 질문 — 무엇을 잃을지 알 수 없는 채로도 망겁을 받아들일 수 있는가.'
+  }
 };
 const trialOutput=document.getElementById('trialOutput');
-document.querySelectorAll('[data-trial]').forEach(btn=>btn.addEventListener('click',()=>{trialOutput.textContent=`${btn.dataset.trial} — ${trials[btn.dataset.trial]}`;}));
+document.querySelectorAll('[data-trial]').forEach(btn=>btn.addEventListener('click',()=>{
+  const t=trials[btn.dataset.trial];
+  if(!t) return;
+  trialOutput.innerHTML=`<div class="trial-output-head"><b>${t.hanja}</b><span>${btn.dataset.trial}</span><small>${t.title}</small></div><p>${t.body}</p><p class="trial-example">${t.example}</p><p class="trial-core">${t.question}</p>`;
+}));
 
 const raceData={
-  human:{rows:[['외형','기본적으로 인간의 모습을 지니며 외형의 범위가 가장 넓다. 수행자의 경우 영력이 강해질수록 눈동자·머리카락·피부 등에 미세한 변화가 나타나기도 한다.'],['수명','보통 60~100년 내외. 뛰어난 수행자는 수백 년까지 수명을 늘릴 수 있다.'],['능력','술법·부적·검술·의술·진법·주술 등 거의 모든 체계를 배울 수 있고 다른 종족의 힘을 빌리거나 계약하는 데도 유연하다.'],['약점','육체와 수명이 약하고 영력의 총량도 비교적 적다. 감정과 욕망에 쉽게 흔들린다.'],['사회적 위치','인간계의 왕조와 도시를 중심으로 가장 거대한 사회를 이룬다.'],['관계','다른 종족과 가장 쉽게 관계를 맺는 동시에 가장 많은 갈등을 일으키는 종족이다.']]},
-  celestial:{rows:[['외형','인간과 비슷하지만 선기가 강하고 노화가 매우 느리다. 일부는 혈통에 따른 문양이나 특이한 눈동자를 가진다.'],['수명','일반적으로 수천 년 이상. 높은 선격을 지닌 존재는 수명의 의미가 희미하다.'],['능력','선기 운용, 결계, 치유, 비행과 자연현상에 대한 높은 수준의 술법을 다룬다.'],['약점','천명과 선계의 법도에 강하게 묶여 있다.'],['사회적 위치','선계의 주류 종족. 천명을 수행하는 관직·가문·문파와 위계가 존재한다.'],['관계','요족과는 오래된 대립과 교류가 공존하며, 용족과는 오래된 협약과 긴장 관계를 유지한다.']]},
-  yao:{rows:[['외형','근원에 따라 크게 다르며 인간형에서도 귀·꼬리·뿔·비늘·깃털·문양 등이 남을 수 있다.'],['수명','종류에 따라 수백~수천 년. 오래 살아갈수록 힘과 지성이 강해지는 경우가 많다.'],['능력','자신의 근원과 연결된 고유 능력과 변신·환술·요기 운용에 능한 경우가 많다.'],['약점','진명 眞名, 본체, 자신의 근원이 약점으로 작용할 수 있고 오래된 맹약과 은혜에 얽히기 쉽다.'],['사회적 위치','통일 국가보다 종족·혈족·영역·강한 개체를 중심으로 세력이 형성된다.'],['관계','인족과는 사랑·계약·복수 등 복잡한 관계를 맺고 선족의 질서주의를 답답하게 보는 경우가 많다.']]},
-  spirit:{rows:[['외형','정해진 형태가 없고 인간형을 취하면 자신이 태어난 자연현상이나 장소의 흔적이 드러난다.'],['수명','근원이 존재하는 동안 수백~수천 년 이상 존재할 수 있다.'],['능력','자신이 태어난 자연·현상을 직접 다루는 데 탁월하며 자신의 영역에서 특히 강하다.'],['약점','근원과의 연결이 가장 큰 약점이다. 근원이 사라지면 함께 소멸하거나 크게 약해질 수 있다.'],['사회적 위치','국가보다 각자의 영역과 자연질서에 따라 살아가며 수호자나 주인으로 존재하는 경우가 많다.'],['관계','인족에게 신이나 정령으로 숭배되기도 하며 요족과 생활권이 겹치고 용족과 자연 영역을 공유한다.']]},
-  dragon:{rows:[['외형','인간형과 용형을 오가며 인간형에서도 뿔·비늘·용문·특이한 눈동자 같은 흔적이 남을 수 있다.'],['수명','보통 수천 년 이상으로 다섯 종족 중 가장 긴 수명을 지닌 축에 속한다.'],['능력','비와 구름, 강과 바다의 수기 水氣와 천기 天氣에 강하고 높은 신체 능력과 영력을 지닌다.'],['약점','개체 수가 적고 번식이 느리며 영역·혈통·오래된 맹약에 강하게 얽혀 있다.'],['사회적 위치','어느 한 계에 완전히 속하지 않는 오래된 독자 세력. 용궁과 혈족 단위로 살아가는 경우가 많다.'],['관계','선족과 질서와 권한을 두고 협력과 충돌을 반복하며 영족과 깊은 유대를 맺는 경우가 많다.']]}
+  human:{rows:[['외관','다른 종족과 구별되는 비인간적 특징 없이 일반적인 인간의 모습을 지닌다. 수행이나 영력의 강함이 외관을 과도하게 변화시키지는 않는다.'],['수명','보통 60~100년 내외. 뛰어난 수행자는 수백 년까지 수명을 늘릴 수 있다.'],['능력','술법·부적·검술·의술·진법·주술 등 거의 모든 체계를 배울 수 있고 다른 종족의 힘을 빌리거나 계약하는 데도 유연하다.'],['약점','육체와 수명이 약하고 영력의 총량도 비교적 적다. 감정과 욕망에 쉽게 흔들린다.'],['사회적 위치','인간계의 왕조와 도시를 중심으로 가장 거대한 사회를 이룬다.'],['관계','다른 종족과 가장 쉽게 관계를 맺는 동시에 가장 많은 갈등을 일으키는 종족이다.']]},
+  celestial:{rows:[['외관','기본적으로 인간과 같은 모습이다. 선족이라는 이유만으로 별도의 비인간적 신체 특징이 나타나지는 않는다.'],['수명','일반적으로 수천 년 이상. 높은 선격을 지닌 존재는 수명의 의미가 희미하다.'],['능력','선기 운용, 결계, 치유, 비행과 자연현상에 대한 높은 수준의 술법을 다룬다.'],['약점','천명과 선계의 법도에 강하게 묶여 있다.'],['사회적 위치','선계의 주류 종족. 천명을 수행하는 관직·가문·문파와 위계가 존재한다.'],['관계','요족과는 오래된 대립과 교류가 공존하며, 용족과는 오래된 협약과 긴장 관계를 유지한다.']]},
+  yao:{rows:[['외관','기본은 인간형이다. 뿔·날개·귀·꼬리·몸 일부의 비늘이나 깃털 같은 특징이 나타날 수 있으나 한 개체에게 여러 특징이 과도하게 겹치지는 않는다.'],['수명','종류에 따라 수백~수천 년. 오래 살아갈수록 힘과 지성이 강해지는 경우가 많다.'],['능력','개체마다 다른 고유 능력을 지니며 변신·환술·요기 운용에 능한 경우가 많다.'],['약점','종족 전체에 공통으로 정해진 약점은 없으며 개체에 따라 다르다.'],['사회적 위치','통일 국가보다 종족·혈족·영역·강한 개체를 중심으로 세력이 형성된다.'],['관계','인족과는 사랑·계약·복수 등 복잡한 관계를 맺고 선족의 질서주의를 답답하게 보는 경우가 많다.']]},
+  dragon:{rows:[['외관','평상시에는 인간형이며 뿔이나 몸 일부의 비늘 정도가 나타날 수 있다. 필요할 때 본래의 용형으로 돌아갈 수 있지만 인간형에서는 과도한 비인간적 특징이나 특이한 동공은 나타나지 않는다.'],['수명','보통 수천 년 이상으로 매우 긴 수명을 지닌다.'],['능력','비와 구름, 강과 바다의 수기 水氣와 천기 天氣에 강하고 높은 신체 능력과 영력을 지닌다.'],['약점','개체 수가 적고 번식이 느리며 영역·혈통·오래된 맹약에 강하게 얽혀 있다.'],['사회적 위치','어느 한 계에 완전히 속하지 않는 오래된 독자 세력. 용궁과 혈족 단위로 살아가는 경우가 많다.'],['관계','선족과 질서와 권한을 두고 협력과 충돌을 반복하며, 인족·요족과도 각 지역과 시대에 따라 다양한 관계를 맺는다.']]}
 };
 const raceDetail=document.getElementById('raceDetail');
 function renderRace(key){const data=raceData[key];raceDetail.innerHTML=data.rows.map(([k,v])=>`<p><strong>${k}</strong>${v}</p>`).join('');document.querySelectorAll('[data-race]').forEach(b=>b.classList.toggle('is-active',b.dataset.race===key));}
