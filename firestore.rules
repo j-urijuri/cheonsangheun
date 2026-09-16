@@ -8,6 +8,12 @@ service cloud.firestore {
 
     function pageIsPublic(section) {
       return (
+        section == "notice"
+        && (
+          !exists(/databases/$(database)/documents/pages/notice)
+          || get(/databases/$(database)/documents/pages/notice).data.status == "public"
+        )
+      ) || (
         section == "story"
         && exists(/databases/$(database)/documents/pages/story)
         && get(/databases/$(database)/documents/pages/story).data.status == "public"

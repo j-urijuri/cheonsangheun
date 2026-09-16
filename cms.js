@@ -10,16 +10,18 @@ const DEMO=window.CHEONSANGHEUN_DEMO===true;
 const editRequested=new URLSearchParams(location.search).get('edit')==='1';
 const isEditorMode=()=>admin&&editRequested;
 const defaults={
-  story:{title:'이야기',intro:'현재 진행되는 이야기를 장면 단위로 읽습니다.',status:'locked',lockedMessage:'아직 공개되지 않은 이야기입니다.',kicker:'VISUAL NOVEL · STORY'},
-  character:{title:'인물',intro:'천상흔의 인물들을 기록합니다.',status:'locked',lockedMessage:'아직 공개되지 않은 인물 기록입니다.',kicker:'CHARACTER INDEX'},
-  archive:{title:'기록',intro:'이야기가 지나간 자리에 남은 기록을 보관합니다.',status:'locked',lockedMessage:'아직 공개되지 않은 기록입니다.',kicker:'ARCHIVE · 記錄庫'}
+  notice:{title:'공지',intro:'세계관과 이야기, 인물 설정, 러닝에 필요한 안내를 모아 둡니다.',status:'public',lockedMessage:'아직 공개되지 않은 안내입니다.',kicker:'운영 안내'},
+  story:{title:'이야기',intro:'현재 진행되는 이야기를 장면 단위로 읽습니다.',status:'locked',lockedMessage:'아직 공개되지 않은 이야기입니다.',kicker:'이야기'},
+  character:{title:'인물',intro:'천상흔의 인물들을 기록합니다.',status:'locked',lockedMessage:'아직 공개되지 않은 인물 기록입니다.',kicker:'인물 기록'},
+  archive:{title:'기록',intro:'이야기가 지나간 자리에 남은 기록을 보관합니다.',status:'locked',lockedMessage:'아직 공개되지 않은 기록입니다.',kicker:'기록고'}
 };
 const esc=(v='')=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const fmt=ts=>{try{return ts?.toDate?.().toLocaleString('ko-KR')||''}catch{return''}};
-const label=s=>s==='story'?'이야기':s==='character'?'인물':'기록';
+const label=s=>s==='notice'?'공지':s==='story'?'이야기':s==='character'?'인물':'기록';
 
 let admin=false,currentUser=null,db=null,auth=null;
 let cache=[], pageCache={}, activeSection='story';
+let activeNoticeCategory='world', activeNoticeId=null;
 let activeEpisodeId=null, activeSceneIndex=0, autoTimer=null, logRows=[];
 let activeStoryFolder='main';
 let editingScenes=[], editingEpisodeId=null, editingSceneIndex=-1;
@@ -154,6 +156,7 @@ const demoContent=[
  {id:'char-01',section:'character',status:'public',sortOrder:1,subtitle:'CHARACTER',title:'인물 기록 예시',excerpt:'캐릭터 페이지는 기존 카드형 구조를 유지하며 추후 상세 프로필과 연결할 수 있습니다.',body:''}
 ];
 const demoPages={
+ notice:{...defaults.notice,status:'public'},
  story:{...defaults.story,status:'public'},
  character:{...defaults.character,status:'public'},
  archive:{...defaults.archive,status:'public'}
@@ -196,10 +199,10 @@ function applyPage(key){
 }
 
 async function loadPages(){
-  if(DEMO||!configured){pageCache={...demoPages};['story','character','archive'].forEach(applyPage);return}
+  if(DEMO||!configured){pageCache={...demoPages};['notice','story','character','archive'].forEach(applyPage);return}
   // pages 문서는 공개/잠금 상태를 판단하는 설정값이므로 일반 방문자도 읽는다.
   // 실제 비공개 내용은 아래 loadContent / Firestore rules에서 별도로 차단한다.
-  for(const key of ['story','character','archive']){
+  for(const key of ['notice','story','character','archive']){
     let data={...defaults[key]};
     try{const s=await getDoc(doc(db,'pages',key));if(s.exists())data={...data,...s.data()}}catch(e){console.warn('page settings load failed',key,e)}
     pageCache[key]=data; applyPage(key);
@@ -213,7 +216,7 @@ async function loadContent(){
     // 일반 주소에서는 공개로 전환된 페이지의 '공개 문서'만 읽는다.
     // 잠긴 페이지 또는 비공개 문서는 Firestore 규칙에서도 거부된다.
     cache=[];
-    for(const key of ['story','character','archive']){
+    for(const key of ['notice','story','character','archive']){
       if(!pageIsPublic(key))continue;
       try{
         const s=await getDocs(query(collection(db,'content'),where('section','==',key),where('status','==','public')));
@@ -222,9 +225,114 @@ async function loadContent(){
     }
   }
   cache.sort((a,b)=>((a.sortOrder??999999)-(b.sortOrder??999999))||((b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0)));
-  renderStory();renderCharacter();renderArchive();
+  renderNotice();renderStory();renderCharacter();renderArchive();
 }
 function visibleFor(key){return cache.filter(p=>p.section===key&&(isEditorMode()||DEMO||(pageIsPublic(key)&&p.status==='public')))}
+
+
+
+/* ---------- 공지 · 메타 안내 ---------- */
+const noticeCategoryNames={world:'세계관 공지',story:'이야기 공지',character:'인물 설정',running:'러닝 공지'};
+function noticeCategoryName(v){return noticeCategoryNames[v]||noticeCategoryNames.world}
+function noticeCategoryOf(p){return Object.hasOwn(noticeCategoryNames,p?.noticeCategory)?p.noticeCategory:'world'}
+function allNotices(){return visibleFor('notice')}
+function notices(){return allNotices().filter(p=>noticeCategoryOf(p)===activeNoticeCategory)}
+function plainToRich(text=''){return String(text).split(/\n{2,}/).map(p=>`<p>${esc(p).replace(/\n/g,'<br>')}</p>`).join('')}
+function sanitizeRichHtml(input=''){
+  const tpl=document.createElement('template');tpl.innerHTML=String(input||'');
+  const allowed=new Set(['P','BR','STRONG','B','EM','I','U','S','STRIKE','H2','H3','BLOCKQUOTE','UL','OL','LI','HR','A','SPAN','DIV']);
+  const allowedStyles=new Set(['background-color','color','text-align','font-weight','font-style','text-decoration']);
+  const cleanStyle=value=>{
+    const out=[];
+    for(const part of String(value||'').split(';')){
+      const i=part.indexOf(':');if(i<0)continue;
+      const prop=part.slice(0,i).trim().toLowerCase(),val=part.slice(i+1).trim();
+      if(!allowedStyles.has(prop)||/url\s*\(|expression\s*\(|javascript:/i.test(val))continue;
+      if(val.length>80)continue;out.push(`${prop}:${val}`);
+    }
+    return out.join(';');
+  };
+  const walk=node=>{
+    for(const child of [...node.childNodes]){
+      if(child.nodeType===Node.COMMENT_NODE){child.remove();continue}
+      if(child.nodeType!==Node.ELEMENT_NODE)continue;
+      if(!allowed.has(child.tagName)){
+        child.replaceWith(...child.childNodes);continue;
+      }
+      for(const attr of [...child.attributes]){
+        const name=attr.name.toLowerCase();
+        if(child.tagName==='A'&&name==='href'){
+          const href=attr.value.trim();if(!/^(https?:|mailto:|#)/i.test(href))child.removeAttribute(attr.name);continue;
+        }
+        if(child.tagName==='A'&&['target','rel','title'].includes(name))continue;
+        if(name==='style'){
+          const style=cleanStyle(attr.value);if(style)child.setAttribute('style',style);else child.removeAttribute('style');continue;
+        }
+        if(name==='align'&&['DIV','P','H2','H3','BLOCKQUOTE'].includes(child.tagName)){
+          const v=attr.value.toLowerCase();if(['left','center','right','justify'].includes(v)){child.setAttribute('style',`${child.getAttribute('style')||''};text-align:${v}`)}
+        }
+        child.removeAttribute(attr.name);
+      }
+      if(child.tagName==='A'){child.setAttribute('rel','noopener noreferrer');if(/^https?:/i.test(child.getAttribute('href')||''))child.setAttribute('target','_blank')}
+      walk(child);
+    }
+  };
+  walk(tpl.content);return tpl.innerHTML;
+}
+function renderNotice(){
+  const root=$('[data-cms-section="notice"]');if(!root)return;
+  const all=allNotices(),list=notices();
+  const counts={world:0,story:0,character:0,running:0};all.forEach(p=>counts[noticeCategoryOf(p)]++);
+  if($('#noticeWorldCount'))$('#noticeWorldCount').textContent=String(counts.world);
+  if($('#noticeStoryCount'))$('#noticeStoryCount').textContent=String(counts.story);
+  if($('#noticeCharacterCount'))$('#noticeCharacterCount').textContent=String(counts.character);
+  if($('#noticeRunningCount'))$('#noticeRunningCount').textContent=String(counts.running);
+  $$('[data-notice-category]').forEach(b=>b.classList.toggle('is-active',b.dataset.noticeCategory===activeNoticeCategory));
+  if($('#noticeCategoryLabel'))$('#noticeCategoryLabel').textContent=noticeCategoryName(activeNoticeCategory);
+  const listEl=$('#noticeList');if(!listEl)return;
+  if(!list.length){listEl.innerHTML='<div class="cms-empty">이 분류에는 아직 공지가 없습니다.</div>';activeNoticeId=null;renderNoticeArticle();return}
+  if(!activeNoticeId||!list.some(p=>p.id===activeNoticeId))activeNoticeId=list[0].id;
+  listEl.innerHTML=list.map(p=>`<button type="button" class="${p.id===activeNoticeId?'is-active':''}" data-notice-id="${esc(p.id)}"><small>${esc(p.dateLabel||fmt(p.updatedAt)||'')}</small><b>${esc(p.title||'(제목 없음)')}</b><p>${esc(p.excerpt||'')}</p></button>`).join('');
+  renderNoticeArticle();
+}
+function renderNoticeArticle(){
+  const empty=$('#noticeEmpty'),view=$('#noticeArticleView'),p=notices().find(x=>x.id===activeNoticeId);
+  if(!p){if(empty)empty.hidden=false;if(view)view.hidden=true;return}
+  if(empty)empty.hidden=true;if(view)view.hidden=false;
+  $('#noticeArticleCategory').textContent=noticeCategoryName(noticeCategoryOf(p));
+  $('#noticeArticleTitle').textContent=p.title||'';
+  $('#noticeArticleMeta').textContent=[p.dateLabel||fmt(p.updatedAt),isEditorMode()?(p.status==='public'?'공개':'비공개'):''].filter(Boolean).join(' · ');
+  $('#noticeArticleExcerpt').textContent=p.excerpt||'';$('#noticeArticleExcerpt').style.display=p.excerpt?'':'none';
+  $('#noticeArticleBody').innerHTML=sanitizeRichHtml(p.bodyHtml||plainToRich(p.body||''));
+  const edit=$('#noticeEditCurrent');if(edit)edit.style.display=isEditorMode()?'':'none';
+}
+$('#noticeCategories')?.addEventListener('click',e=>{const b=e.target.closest('[data-notice-category]');if(!b)return;activeNoticeCategory=Object.hasOwn(noticeCategoryNames,b.dataset.noticeCategory)?b.dataset.noticeCategory:'world';activeNoticeId=null;renderNotice()});
+$('#noticeList')?.addEventListener('click',e=>{const b=e.target.closest('[data-notice-id]');if(!b)return;activeNoticeId=b.dataset.noticeId;renderNotice()});
+$('#noticeEditCurrent')?.addEventListener('click',()=>{if(activeNoticeId)openNoticeEditor(activeNoticeId)});
+function focusNoticeEditor(){const ed=$('#noticeRichEditor');ed?.focus()}
+function newNotice(){
+  if(!isEditorMode())return;activeSection='notice';$('#noticeDocId').value='';$('#noticeEditorCategory').value=activeNoticeCategory;$('#noticeEditorVisibility').value='private';$('#noticeEditorOrder').value='';$('#noticeEditorDate').value='';$('#noticeEditorTitle').value='';$('#noticeEditorExcerpt').value='';$('#noticeRichEditor').innerHTML='';$('#noticeEditorHeading').textContent='새 공지';$('#noticeDeleteBtn').style.display='none';$('#noticeEditorStatus').textContent='';openShade('noticeEditorShade');setTimeout(focusNoticeEditor,0)
+}
+function openNoticeEditor(id){
+  if(!isEditorMode())return;const p=cache.find(x=>x.id===id&&x.section==='notice');if(!p)return;activeSection='notice';activeNoticeId=id;activeNoticeCategory=noticeCategoryOf(p);$('#noticeDocId').value=p.id;$('#noticeEditorCategory').value=activeNoticeCategory;$('#noticeEditorVisibility').value=p.status||'private';$('#noticeEditorOrder').value=p.sortOrder??'';$('#noticeEditorDate').value=p.dateLabel||'';$('#noticeEditorTitle').value=p.title||'';$('#noticeEditorExcerpt').value=p.excerpt||'';$('#noticeRichEditor').innerHTML=sanitizeRichHtml(p.bodyHtml||plainToRich(p.body||''));$('#noticeEditorHeading').textContent=p.title||'공지 편집';$('#noticeDeleteBtn').style.display='';$('#noticeEditorStatus').textContent=fmt(p.updatedAt);openShade('noticeEditorShade');setTimeout(focusNoticeEditor,0)
+}
+function closeNoticeEditor(){closeShade('noticeEditorShade')}
+$('[data-notice-close]')?.addEventListener('click',closeNoticeEditor);
+$('#noticeEditorShade')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeNoticeEditor()});
+$('#noticeToolbar')?.addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault()});
+$('#noticeToolbar')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-rich-command]');if(!b)return;focusNoticeEditor();const cmd=b.dataset.richCommand,val=b.dataset.richValue||null;try{document.execCommand(cmd,false,val)}catch(err){console.warn('rich command failed',cmd,err)}focusNoticeEditor()
+});
+$('#noticeBlockFormat')?.addEventListener('change',e=>{focusNoticeEditor();try{document.execCommand('formatBlock',false,e.target.value)}catch{}focusNoticeEditor()});
+$('#noticeSaveBtn')?.addEventListener('click',async()=>{
+  if(!isEditorMode())return;const title=$('#noticeEditorTitle').value.trim();if(!title){$('#noticeEditorStatus').textContent='제목을 입력해 주세요.';return}
+  const category=Object.hasOwn(noticeCategoryNames,$('#noticeEditorCategory').value)?$('#noticeEditorCategory').value:'world';
+  const bodyHtml=sanitizeRichHtml($('#noticeRichEditor').innerHTML);const bodyText=$('#noticeRichEditor').innerText.trim();
+  const payload={section:'notice',noticeCategory:category,status:$('#noticeEditorVisibility').value,title,excerpt:$('#noticeEditorExcerpt').value.trim(),bodyHtml,body:bodyText,dateLabel:$('#noticeEditorDate').value.trim(),sortOrder:$('#noticeEditorOrder').value===''?null:Number($('#noticeEditorOrder').value),editorName:$('#cmsEditorName')?.value.trim()||editorRemembered,authorUid:currentUser.uid,updatedAt:serverTimestamp()};
+  try{const id=$('#noticeDocId').value;if(id){await updateDoc(doc(db,'content',id),payload);activeNoticeId=id}else{payload.createdAt=serverTimestamp();const r=await addDoc(collection(db,'content'),payload);activeNoticeId=r.id}activeNoticeCategory=category;$('#noticeEditorStatus').textContent='저장됨';await loadContent();closeNoticeEditor()}catch(err){console.error(err);$('#noticeEditorStatus').textContent=`저장 실패 · ${err?.code||err?.message||''}`}
+});
+$('#noticeDeleteBtn')?.addEventListener('click',async()=>{const id=$('#noticeDocId').value;if(!id||!confirm('이 공지를 삭제할까요?'))return;try{await deleteDoc(doc(db,'content',id));activeNoticeId=null;$('#noticeEditorStatus').textContent='삭제됨';await loadContent();closeNoticeEditor()}catch(err){console.error(err);$('#noticeEditorStatus').textContent='삭제 실패'}});
+
 
 /* ---------- VISUAL NOVEL ---------- */
 function storyFolderOf(e){return e?.storyFolder==='character'?'character':'main'}
@@ -446,7 +554,7 @@ function showCmsForAdmin(){
  if($('#vnEditScene'))$('#vnEditScene').style.display='';
  if($('#archiveEditRecord'))$('#archiveEditRecord').style.display='';
 }
-function hideAdminControls(){document.body.classList.remove('cms-editing')}
+function hideAdminControls(){document.body.classList.remove('cms-editing');if($('#noticeEditCurrent'))$('#noticeEditCurrent').style.display='none'}
 function openPage(key){
  activeSection=key;const p=pageCache[key]||defaults[key];
  $('#cmsPageHeading').textContent=`${p.title||label(key)} 페이지 편집`;$('#cmsPageTitle').value=p.title||'';$('#cmsPageIntro').value=p.intro||'';$('#cmsPageStatus').value=p.status||'locked';$('#cmsLockedMessage').value=p.lockedMessage||'';$('#cmsPageKicker').value=p.kicker||'';$('#cmsPageStatusText').textContent='';
@@ -484,7 +592,7 @@ $$('.cms-editor-shade').forEach(sh=>sh.addEventListener('click',e=>{
  if(sh.id==='vnSceneShade')return;
  closeShade(sh.id)
 }));
-$$('[data-cms-new]').forEach(b=>b.onclick=()=>{const sec=b.closest('[data-cms-section]')?.dataset.cmsSection;if(sec==='character')return;resetDoc(sec)});
+$$('[data-cms-new]').forEach(b=>b.onclick=()=>{const sec=b.closest('[data-cms-section]')?.dataset.cmsSection;if(sec==='character')return;if(sec==='notice'){newNotice();return}resetDoc(sec)});
 $$('[data-cms-page-edit]').forEach(b=>b.onclick=()=>openPage(b.closest('[data-cms-section]').dataset.cmsSection));
 
 /* ---------- EPISODE / SCENE EDITOR · v64 STUDIO ---------- */
