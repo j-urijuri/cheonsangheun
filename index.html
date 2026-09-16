@@ -7,6 +7,10 @@
 <meta content="#11100f" name="theme-color"/>
 <meta content="천상흔 天上痕" name="description"/>
 <title>천상흔 天上痕</title>
+<link rel="icon" href="./favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="./favicon-64.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
 <style>:root{
   --bg:#0f0e0d;
   --ink:#1b1714;
@@ -4732,7 +4736,7 @@ if (window.dat && dat.GUI) {
 (()=>{
   const useFirebase=window.CHEONSANGHEUN_USE_FIREBASE===true;
   const sc=document.createElement('script');
-  sc.src=useFirebase?'./cms.js?v=64.0':'./demo.js?v=64.0';
+  sc.src=useFirebase?'./cms.js?v=64.3.0':'./demo.js?v=64.0';
   if(useFirebase) sc.type='module';
   document.body.appendChild(sc);
 })();

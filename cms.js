@@ -8,6 +8,7 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const configured=!Object.values(firebaseConfig).some(v=>String(v).includes('PASTE_'))&&!ADMIN_UID.includes('PASTE_');
 const DEMO=window.CHEONSANGHEUN_DEMO===true;
 const editRequested=new URLSearchParams(location.search).get('edit')==='1';
+const isEditorMode=()=>admin&&editRequested;
 const defaults={
   story:{title:'이야기',intro:'현재 진행되는 이야기를 장면 단위로 읽습니다.',status:'locked',lockedMessage:'아직 공개되지 않은 이야기입니다.',kicker:'VISUAL NOVEL · STORY'},
   character:{title:'인물',intro:'천상흔의 인물들을 기록합니다.',status:'locked',lockedMessage:'아직 공개되지 않은 인물 기록입니다.',kicker:'CHARACTER INDEX'},
@@ -35,7 +36,7 @@ function r2Endpoint(){return String(r2Config().endpoint||'').replace(/\/$/,'')}
 function dispatchInput(el){el?.dispatchEvent(new Event('input',{bubbles:true}));el?.dispatchEvent(new Event('change',{bubbles:true}))}
 function chooseFile(accept='*/*'){return new Promise(resolve=>{const input=document.createElement('input');input.type='file';input.accept=accept;input.style.display='none';document.body.appendChild(input);input.addEventListener('change',()=>{const f=input.files?.[0]||null;input.remove();resolve(f)},{once:true});input.addEventListener('cancel',()=>{input.remove();resolve(null)},{once:true});input.click()})}
 async function uploadR2File(file,kind,button){
-  if(!admin||!currentUser)throw new Error('관리자 로그인 후 업로드할 수 있습니다.');
+  if(!isEditorMode()||!currentUser)throw new Error('관리자 편집 모드에서만 업로드할 수 있습니다.');
   if(!r2Ready())throw new Error('R2 Worker가 아직 연결되지 않았습니다. r2-config.js에 Worker 주소를 넣어 주세요.');
   const maxImage=20*1024*1024,maxAudio=50*1024*1024;
   if(file.type.startsWith('image/')&&file.size>maxImage)throw new Error('이미지는 20MB 이하만 업로드할 수 있습니다.');
@@ -53,7 +54,7 @@ async function uploadR2File(file,kind,button){
 async function removeR2Asset(value){
   const url=String(value||'').trim();if(!url)return;
   if(!r2Ready()||!url.startsWith(r2Endpoint()+'/media/'))return;
-  if(!admin||!currentUser)throw new Error('관리자 로그인 후 삭제할 수 있습니다.');
+  if(!isEditorMode()||!currentUser)throw new Error('관리자 편집 모드에서만 삭제할 수 있습니다.');
   const token=await currentUser.getIdToken(true);
   const res=await fetch(url,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
   if(!res.ok){let d={};try{d=await res.json()}catch{}throw new Error(d.error||`저장소 삭제 실패 (${res.status})`)}
@@ -123,7 +124,7 @@ function unlockArchive(id){
   const s=unlockedSet();
   if(!s.has(id)){s.add(id);localStorage.setItem(unlockKey,JSON.stringify([...s]));renderArchive();}
 }
-function isArchiveUnlocked(p){return admin||p.unlockMode!=='story'||unlockedSet().has(p.id)}
+function isArchiveUnlocked(p){return isEditorMode()||p.unlockMode!=='story'||unlockedSet().has(p.id)}
 
 function applyPage(key){
   const root=$(`[data-cms-section="${key}"]`),data=pageCache[key]||defaults[key];
@@ -137,12 +138,17 @@ function applyPage(key){
     lock.querySelector('h2').textContent=data.title||defaults[key].title;
     lock.querySelector('p').textContent=data.lockedMessage||defaults[key].lockedMessage;
   }
-  if(admin || DEMO || data.status==='public'){if(cms)cms.style.display=key==='character'?'block':'flex';if(lock)lock.style.display='none'}
+  if(isEditorMode() || DEMO){if(cms)cms.style.display=key==='character'?'block':'flex';if(lock)lock.style.display='none'}
   else{if(cms)cms.style.display='none';if(lock)lock.style.display='grid'}
 }
 
 async function loadPages(){
   if(DEMO||!configured){pageCache={...demoPages};['story','character','archive'].forEach(applyPage);return}
+  if(!isEditorMode()){
+    pageCache={story:{...defaults.story},character:{...defaults.character},archive:{...defaults.archive}};
+    ['story','character','archive'].forEach(applyPage);
+    return;
+  }
   for(const key of ['story','character','archive']){
     let data={...defaults[key]};
     try{const s=await getDoc(doc(db,'pages',key));if(s.exists())data={...data,...s.data()}}catch(e){}
@@ -151,22 +157,24 @@ async function loadPages(){
 }
 async function loadContent(){
   if(DEMO||!configured){cache=structuredClone(demoContent)}
-  else if(admin){
+  else if(isEditorMode()){
     const s=await getDocs(collection(db,'content')); cache=s.docs.map(d=>({id:d.id,...d.data()}))
   }else{
-    try{const s=await getDocs(query(collection(db,'content'),where('status','==','public')));cache=s.docs.map(d=>({id:d.id,...d.data()}))}catch(e){cache=[]}
+    // 현재 STORY / CHARACTER / ARCHIVE는 잠금 상태다.
+    // 관리자 세션이 브라우저에 남아 있어도 ?edit=1 편집 모드가 아니면 비공개 데이터를 불러오지 않는다.
+    cache=[]
   }
   cache.sort((a,b)=>((a.sortOrder??999999)-(b.sortOrder??999999))||((b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0)));
   renderStory();renderCharacter();renderArchive();
 }
-function visibleFor(key){return cache.filter(p=>p.section===key&&(admin||DEMO||p.status==='public'))}
+function visibleFor(key){return cache.filter(p=>p.section===key&&(isEditorMode()||DEMO))}
 
 /* ---------- VISUAL NOVEL ---------- */
 function episodes(){return visibleFor('story')}
 function renderStory(){
   const root=$('[data-cms-section="story"]'); if(!root)return;
   const list=$('#vnEpisodeList'),status=root.querySelector('[data-cms-status]'),eps=episodes();
-  status.textContent=admin?`${eps.length}개 에피소드 · 실제 페이지에서 장면을 바로 편집할 수 있습니다.`:'';
+  status.textContent=isEditorMode()?`${eps.length}개 에피소드 · 실제 페이지에서 장면을 바로 편집할 수 있습니다.`:'';
   if(!eps.length){
     list.innerHTML='<div class="cms-empty">아직 공개된 이야기가 없습니다.</div>';
     activeEpisodeId=null;renderScene();return;
@@ -252,7 +260,7 @@ function refreshPairCards(){
 }
 async function loadCharacterPairs(){
  refreshPairCards();
- if(DEMO||!configured||!admin||!db)return;
+ if(DEMO||!configured||!isEditorMode()||!db)return;
  try{
    const snap=await getDocs(collection(db,'characterPairs'));
    const pairs=pairMap();
@@ -275,10 +283,10 @@ function fillPairEditor(key){
  }
  pairPreview('pairLeftPreview',p.leftImage,'LEFT FULLBODY');pairPreview('pairRightPreview',p.rightImage,'RIGHT FULLBODY');$('#pairEditorStatus').textContent='';
 }
-function openPairEditor(key='pair01'){if(!admin)return;mountPairEditorInsideDialog();fillPairEditor(pairMap()[key]?key:'pair01');openShade('pairEditorShade');setTimeout(()=>{const p=$('#pairEditorShade .pair-editor-paper');if(p)p.scrollTop=0},0)}
+function openPairEditor(key='pair01'){if(!isEditorMode())return;mountPairEditorInsideDialog();fillPairEditor(pairMap()[key]?key:'pair01');openShade('pairEditorShade');setTimeout(()=>{const p=$('#pairEditorShade .pair-editor-paper');if(p)p.scrollTop=0},0)}
 function collectSide(prefix){return {name:$('#'+prefix+'Name').value.trim(),quote:$('#'+prefix+'Quote').value.trim(),catchphrase:$('#'+prefix+'Catch').value.trim(),gender:$('#'+prefix+'Gender').value.trim(),height:$('#'+prefix+'Height').value.trim(),age:$('#'+prefix+'Age').value.trim(),race:$('#'+prefix+'Race').value.trim(),realm:$('#'+prefix+'Realm').value.trim(),rows:[{label:'외형',value:$('#'+prefix+'Appearance').value},{label:'성격',value:$('#'+prefix+'Personality').value},{label:'능력',value:$('#'+prefix+'Ability').value},{label:'천명 또는 목표',value:$('#'+prefix+'Destiny').value},{label:'중요한 인연',value:$('#'+prefix+'Relation').value},{label:'기타',value:$('#'+prefix+'Other').value}]}}
 async function savePairProfile(){
- if(!admin)return;const key=$('#pairEditorKey').value;const payload={title:$('#pairTitleInput').value.trim()||key.toUpperCase(),subtitle:$('#pairSubtitleInput').value.trim(),previewImage:$('#pairPreviewInput').value.trim(),leftImage:$('#pairLeftImage').value.trim(),rightImage:$('#pairRightImage').value.trim(),left:collectSide('pairLeft'),right:collectSide('pairRight'),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
+ if(!isEditorMode())return;const key=$('#pairEditorKey').value;const payload={title:$('#pairTitleInput').value.trim()||key.toUpperCase(),subtitle:$('#pairSubtitleInput').value.trim(),previewImage:$('#pairPreviewInput').value.trim(),leftImage:$('#pairLeftImage').value.trim(),rightImage:$('#pairRightImage').value.trim(),left:collectSide('pairLeft'),right:collectSide('pairRight'),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
  try{await setDoc(doc(db,'characterPairs',key),payload,{merge:true});mergePair(pairMap()[key],payload);refreshPairCards();$('#pairEditorStatus').textContent='저장됨 · 현재 프로필에 반영됨';const dialog=$('#pairDialog');if(dialog?.open&&dialog.dataset.activePair===key&&window.CHEONSANGHEUN_OPEN_PAIR){window.CHEONSANGHEUN_OPEN_PAIR(key,true);mountPairEditorInsideDialog();openShade('pairEditorShade')}}catch(e){console.error('pair save failed',e);$('#pairEditorStatus').textContent=`저장 실패 · ${e?.code||e?.message||'unknown error'}`}
 }
 $('#characterPairManager')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
@@ -294,7 +302,7 @@ $('#pairSaveBtn')?.addEventListener('click',savePairProfile);
 function renderArchive(){
  const root=$('[data-cms-section="archive"]');if(!root)return;
  const list=$('#archiveCmsList'),status=root.querySelector('[data-cms-status]'),posts=visibleFor('archive');
- status.textContent=admin?`${posts.length}개 기록 · 스토리 장면에 기록 해금을 연결할 수 있습니다.`:'';
+ status.textContent=isEditorMode()?`${posts.length}개 기록 · 스토리 장면에 기록 해금을 연결할 수 있습니다.`:'';
  if(!posts.length){list.innerHTML='<div class="cms-empty">아직 작성된 기록이 없습니다.</div>';$('#archiveCmsDetail').innerHTML=archiveEmpty();return}
  if(!currentArchiveId||!posts.some(p=>p.id===currentArchiveId&&isArchiveUnlocked(p)))currentArchiveId=posts.find(isArchiveUnlocked)?.id||null;
  list.innerHTML=posts.map(p=>{const unlocked=isArchiveUnlocked(p);return `<article class="archive-record-card ${unlocked?'':'locked'} ${p.id===currentArchiveId?'is-active':''}" data-archive-id="${p.id}">
@@ -303,7 +311,7 @@ function renderArchive(){
  </article>`}).join('');
  list.querySelectorAll('[data-archive-id]').forEach(el=>el.onclick=()=>{
    const p=posts.find(x=>x.id===el.dataset.archiveId);if(!p)return;
-   if(!isArchiveUnlocked(p) && !admin)return;
+   if(!isArchiveUnlocked(p) && !isEditorMode())return;
    currentArchiveId=p.id;renderArchive();
  });
  const active=posts.find(p=>p.id===currentArchiveId);
@@ -488,14 +496,14 @@ $('#archiveEditRecord')?.addEventListener('click',()=>{if(currentArchiveId)openD
 
 /* ---------- SAVE ---------- */
 async function saveDoc(){
- if(!admin)return;const title=$('#cmsTitle').value.trim();if(!title){$('#cmsDocStatus').textContent='제목을 입력해 주세요.';return}
+ if(!isEditorMode())return;const title=$('#cmsTitle').value.trim();if(!title){$('#cmsDocStatus').textContent='제목을 입력해 주세요.';return}
  const editorName=$('#cmsEditorName').value.trim();if(editorName)localStorage.setItem('cheonsangheun-editor-name',editorName);
  const payload={section:$('#cmsSection').value,status:$('#cmsVisibility').value,title,subtitle:$('#cmsSubtitle').value.trim(),dateLabel:$('#cmsDateLabel').value.trim(),excerpt:$('#cmsExcerpt').value.trim(),body:$('#cmsBody').value,sortOrder:$('#cmsSortOrder').value===''?null:Number($('#cmsSortOrder').value),imageUrl:$('#cmsImageUrl').value.trim(),unlockMode:$('#cmsUnlockMode').value,editorName,authorUid:currentUser.uid,updatedAt:serverTimestamp()};
  try{const id=$('#cmsDocId').value;if(id)await updateDoc(doc(db,'content',id),payload);else{payload.createdAt=serverTimestamp();const r=await addDoc(collection(db,'content'),payload);$('#cmsDocId').value=r.id}$('#cmsDocStatus').textContent='저장됨';await loadContent();closeShade('cmsDocShade')}catch(e){console.error(e);$('#cmsDocStatus').textContent='저장 실패'}
 }
 $('#cmsSaveDoc')?.addEventListener('click',saveDoc);
 $('#cmsDeleteDoc')?.addEventListener('click',async()=>{const id=$('#cmsDocId').value;if(!id||!confirm('이 문서를 삭제할까요?'))return;try{await deleteDoc(doc(db,'content',id));await loadContent();closeShade('cmsDocShade')}catch(e){$('#cmsDocStatus').textContent='삭제 실패'}})
-$('#cmsSavePage')?.addEventListener('click',async()=>{if(!admin)return;const payload={title:$('#cmsPageTitle').value.trim(),intro:$('#cmsPageIntro').value,status:$('#cmsPageStatus').value,lockedMessage:$('#cmsLockedMessage').value.trim(),kicker:$('#cmsPageKicker').value.trim(),updatedAt:serverTimestamp(),editorName:$('#cmsEditorName')?.value.trim()||''};try{await setDoc(doc(db,'pages',activeSection),payload,{merge:true});pageCache[activeSection]={...(pageCache[activeSection]||defaults[activeSection]),...payload};applyPage(activeSection);$('#cmsPageStatusText').textContent='저장됨';closeShade('cmsPageShade')}catch(e){$('#cmsPageStatusText').textContent='저장 실패'}})
+$('#cmsSavePage')?.addEventListener('click',async()=>{if(!isEditorMode())return;const payload={title:$('#cmsPageTitle').value.trim(),intro:$('#cmsPageIntro').value,status:$('#cmsPageStatus').value,lockedMessage:$('#cmsLockedMessage').value.trim(),kicker:$('#cmsPageKicker').value.trim(),updatedAt:serverTimestamp(),editorName:$('#cmsEditorName')?.value.trim()||''};try{await setDoc(doc(db,'pages',activeSection),payload,{merge:true});pageCache[activeSection]={...(pageCache[activeSection]||defaults[activeSection]),...payload};applyPage(activeSection);$('#cmsPageStatusText').textContent='저장됨';closeShade('cmsPageShade')}catch(e){$('#cmsPageStatusText').textContent='저장 실패'}})
 function autoArchiveIdForEpisode(episodeId){return `story-${episodeId}`}
 async function syncEpisodeArchive(episodeId,payload,scenesForSave){
  const archiveId=autoArchiveIdForEpisode(episodeId);
@@ -519,7 +527,7 @@ async function syncEpisodeArchive(episodeId,payload,scenesForSave){
 }
 
 $('#vnSaveEpisode')?.addEventListener('click',async()=>{
- if(!admin)return;const title=$('#vnEpisodeTitle').value.trim();if(!title){$('#vnEpisodeStatus').textContent='제목을 입력해 주세요.';return}
+ if(!isEditorMode())return;const title=$('#vnEpisodeTitle').value.trim();if(!title){$('#vnEpisodeStatus').textContent='제목을 입력해 주세요.';return}
  // 오른쪽 장면 설정을 수정한 채 바로 에피소드 저장을 눌러도 최신 내용까지 함께 반영합니다.
  if(sceneFormDirty&&$('#vnSceneInlineMount .vn-scene-paper')?.classList.contains('is-active')){
    const draft=sceneDraftFromForm();

@@ -139,3 +139,9 @@ Cloudflare 설정용 파일은 GitHub Pages에서 실행되는 파일이 아닙�
 - VN Studio LIVE PREVIEW가 실제 STORY 플레이 영역의 현재 종횡비를 읽어 그대로 사용합니다.
 - STORY / CHARACTER / ARCHIVE Firestore 데이터는 현재 규칙상 관리자 UID만 읽고 쓸 수 있습니다.
 - 비공개 내용을 정적 HTML/JS에 직접 하드코딩하지 마세요. GitHub Pages 소스는 공개됩니다.
+
+
+## v64.3 잠금 동작
+- 일반 `index.html` 접속은 관리자 로그인 세션이 남아 있어도 STORY / CHARACTER / ARCHIVE를 잠금 상태로 표시합니다.
+- `admin.html`에서 `편집 모드로 입장`하여 `index.html?edit=1`로 들어온 경우에만 비공개 Firestore 데이터를 불러옵니다.
+- Firestore 규칙 자체도 관리자 UID만 read/write 가능 상태를 유지합니다.
