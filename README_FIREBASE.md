@@ -133,3 +133,9 @@ Cloudflare 설정용 파일은 GitHub Pages에서 실행되는 파일이 아닙�
 - STORY 편집창을 장면 목록 / 실시간 VN 미리보기 / 장면 설정의 3단 구조로 정리했습니다.
 - 장면 드래그 순서 변경, 장면 복제, 이미지/대사 실시간 미리보기, BGM·환경음·SE 미리듣기, 저장 전 변경 경고를 추가했습니다.
 - 실제 Firestore 반영은 `에피소드 저장` 버튼을 누를 때 이루어지며, 저장 직후 STORY와 ARCHIVE 다시보기가 갱신됩니다.
+
+
+## v64.1
+- VN Studio LIVE PREVIEW가 실제 STORY 플레이 영역의 현재 종횡비를 읽어 그대로 사용합니다.
+- STORY / CHARACTER / ARCHIVE Firestore 데이터는 현재 규칙상 관리자 UID만 읽고 쓸 수 있습니다.
+- 비공개 내용을 정적 HTML/JS에 직접 하드코딩하지 마세요. GitHub Pages 소스는 공개됩니다.

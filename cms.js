@@ -397,6 +397,12 @@ function mountSceneEditorInline(){
  mount.appendChild(paper);paper.classList.remove('is-active');shade.remove();sceneEditorMounted=true;
  attachVnStudioInputEvents();addVnAudioPreviewButtons();
 }
+function syncVnPreviewRatio(){
+ const source=$('#vnStageBg'),preview=$('#vnEditStage');if(!preview)return;
+ const r=source?.getBoundingClientRect?.();
+ if(r&&r.width>40&&r.height>40){preview.style.setProperty('--vn-preview-ratio',`${r.width} / ${r.height}`);preview.dataset.ratio=`${Math.round(r.width)}×${Math.round(r.height)}`}
+ else{preview.style.setProperty('--vn-preview-ratio','16 / 9');preview.dataset.ratio='16:9'}
+}
 function setStudioDirty(dirty=true){
  episodeDirty=dirty||episodeDirty;
  const el=$('#vnStudioDirty');if(el){el.textContent=episodeDirty?'UNSAVED':'SAVED';el.classList.toggle('is-dirty',episodeDirty)}
@@ -437,11 +443,11 @@ async function previewVnAudio(id,button){
 vnEditorAudio.addEventListener('ended',()=>{if(vnEditorAudioButton){vnEditorAudioButton.classList.remove('is-playing');vnEditorAudioButton.textContent='▶ 미리듣기';vnEditorAudioButton=null}});
 function resetStudioSelection(){editingSceneIndex=-1;sceneFormDirty=false;scenePreviewLocalUrl='';$('#vnSceneInlineMount .vn-scene-paper')?.classList.remove('is-active');$('#vnSceneInspectorEmpty')?.removeAttribute('hidden');$('#vnStudioPreviewTitle').textContent='장면을 선택해 주세요';renderEditorScenePreview(null)}
 function newEpisode(){
- mountSceneEditorInline();editingEpisodeId=null;editingScenes=[];$('#vnEpisodeId').value='';$('#vnEpisodeVisibility').value='private';$('#vnEpisodeChapter').value='';$('#vnEpisodeOrder').value='';$('#vnEpisodeTitle').value='';$('#vnEpisodeExcerpt').value='';$('#vnEpisodeBgm').value='';$('#vnEpisodeHeading').textContent='새 에피소드';$('#vnDeleteEpisode').style.display='none';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);openShade('vnEpisodeShade')
+ mountSceneEditorInline();editingEpisodeId=null;editingScenes=[];$('#vnEpisodeId').value='';$('#vnEpisodeVisibility').value='private';$('#vnEpisodeChapter').value='';$('#vnEpisodeOrder').value='';$('#vnEpisodeTitle').value='';$('#vnEpisodeExcerpt').value='';$('#vnEpisodeBgm').value='';$('#vnEpisodeHeading').textContent='새 에피소드';$('#vnDeleteEpisode').style.display='none';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);syncVnPreviewRatio();openShade('vnEpisodeShade');requestAnimationFrame(syncVnPreviewRatio)
 }
 function openEpisodeEditor(id=activeEpisodeId){
  mountSceneEditorInline();const ep=cache.find(x=>x.id===id&&x.section==='story');if(!ep)return;
- editingEpisodeId=ep.id;editingScenes=structuredClone(ep.scenes||[]);$('#vnEpisodeId').value=ep.id;$('#vnEpisodeVisibility').value=ep.status||'private';$('#vnEpisodeChapter').value=ep.subtitle||'';$('#vnEpisodeOrder').value=ep.sortOrder??'';$('#vnEpisodeTitle').value=ep.title||'';$('#vnEpisodeExcerpt').value=ep.excerpt||'';$('#vnEpisodeBgm').value=ep.bgmUrl||'';$('#vnEpisodeHeading').textContent=ep.title||'에피소드 편집';$('#vnDeleteEpisode').style.display='';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);openShade('vnEpisodeShade')
+ editingEpisodeId=ep.id;editingScenes=structuredClone(ep.scenes||[]);$('#vnEpisodeId').value=ep.id;$('#vnEpisodeVisibility').value=ep.status||'private';$('#vnEpisodeChapter').value=ep.subtitle||'';$('#vnEpisodeOrder').value=ep.sortOrder??'';$('#vnEpisodeTitle').value=ep.title||'';$('#vnEpisodeExcerpt').value=ep.excerpt||'';$('#vnEpisodeBgm').value=ep.bgmUrl||'';$('#vnEpisodeHeading').textContent=ep.title||'에피소드 편집';$('#vnDeleteEpisode').style.display='';episodeDirty=false;renderSceneEditorList();resetStudioSelection();setStudioDirty(false);syncVnPreviewRatio();openShade('vnEpisodeShade');requestAnimationFrame(syncVnPreviewRatio)
 }
 function renderSceneEditorList(){
  const list=$('#vnSceneEditorList');if(!list)return;
@@ -476,6 +482,7 @@ $('#vnSaveScene')?.addEventListener('click',()=>{
 $('#vnDuplicateScene')?.addEventListener('click',()=>{if(editingSceneIndex<0)return;const copy=structuredClone(sceneDraftFromForm());editingScenes.splice(editingSceneIndex+1,0,copy);editingSceneIndex++;sceneFormDirty=false;setStudioDirty(true);renderSceneEditorList();openSceneEditor(editingSceneIndex,{skipConfirm:true});$('#vnSceneStatus').textContent='복제됨'});
 $('#vnDeleteScene')?.addEventListener('click',()=>{if(editingSceneIndex<0)return;if(confirm('이 장면을 삭제할까요?')){editingScenes.splice(editingSceneIndex,1);setStudioDirty(true);renderSceneEditorList();resetStudioSelection()}});
 $('#vnNewEpisode')?.addEventListener('click',newEpisode);$('#vnEditEpisode')?.addEventListener('click',()=>openEpisodeEditor());$('#vnEditScene')?.addEventListener('click',()=>{const ep=currentEpisode();if(!ep)return;openEpisodeEditor(ep.id);setTimeout(()=>openSceneEditor(activeSceneIndex,{skipConfirm:true}),50)});
+window.addEventListener('resize',()=>{if($('#vnEpisodeShade')?.classList.contains('open'))syncVnPreviewRatio()});
 window.addEventListener('beforeunload',e=>{if(!episodeDirty)return;e.preventDefault();e.returnValue=''});
 $('#archiveEditRecord')?.addEventListener('click',()=>{if(currentArchiveId)openDoc(currentArchiveId)});
 
