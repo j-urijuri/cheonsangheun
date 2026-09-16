@@ -1,12 +1,12 @@
 // Firebase Web App configuration for 천상흔.
-// This object is client-side Firebase configuration; access control is enforced by Auth + Firestore Security Rules.
+// This client-side config is intentionally public; access control is enforced by Firebase Auth + Firestore Security Rules.
 export const firebaseConfig = {
-  apiKey: "AIzaSyDMxiWGHYT9YNHavnEghYENxLOoNCc9A-c",
-  authDomain: "cheonsangheun.firebaseapp.com",
-  projectId: "cheonsangheun",
-  storageBucket: "cheonsangheun.firebasestorage.app",
-  messagingSenderId: "675700435388",
-  appId: "1:675700435388:web:2dd74cc7c4cf6a1a8e23b9"
+  apiKey: "AIzaSyC1AxjIRKzu1Nkg7HmkC_BN0q5Hvr5zZbM",
+  authDomain: "cheonsangheun-e6e8a.firebaseapp.com",
+  projectId: "cheonsangheun-e6e8a",
+  storageBucket: "cheonsangheun-e6e8a.firebasestorage.app",
+  messagingSenderId: "109676165566",
+  appId: "1:109676165566:web:dc685aea22b4cde4fa21ef"
 };
 
 // Shared administrator account UID.

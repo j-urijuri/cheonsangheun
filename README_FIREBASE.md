@@ -35,3 +35,11 @@ Firebase Console > Firestore Database > 규칙에 이 폴더의 `firestore.rules
 - 관리자 비밀번호를 코드나 GitHub에 넣지 마세요.
 - `firebase-config.js`의 Web App configuration은 브라우저에서 사용되는 식별 정보입니다. 실제 데이터 보호는 Firebase Authentication과 Firestore Security Rules가 담당합니다.
 - 공개 단계가 되면 Firestore Rules를 수정해 `public` 콘텐츠만 방문자가 읽을 수 있게 열 예정입니다.
+
+## 현재 연결 프로젝트
+- Firebase projectId: `cheonsangheun-e6e8a`
+- authDomain: `cheonsangheun-e6e8a.firebaseapp.com`
+- GitHub Pages authorized domain: `j-urijuri.github.io`
+- 관리자 UID는 `firebase-config.js`와 Firestore Rules에서 동일해야 합니다.
+
+기존 GitHub 파일을 이 버전으로 교체한 뒤 `https://j-urijuri.github.io/cheonsangheun/admin.html`에서 로그인 테스트하세요.
