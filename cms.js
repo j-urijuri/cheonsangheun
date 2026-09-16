@@ -225,6 +225,11 @@ $('#vnSound')?.addEventListener('click',toggleVnSound);updateVnSoundButton();
 const pairKeys=Array.from({length:10},(_,i)=>`pair${String(i+1).padStart(2,'0')}`);
 const pairRows=['외형','성격','능력','천명 또는 목표','중요한 인연','기타'];
 function pairMap(){return window.CHEONSANGHEUN_PAIR_DATA||{}}
+function mountPairEditorInsideDialog(){
+  const dialog=$('#pairDialog'),shade=$('#pairEditorShade');
+  if(dialog&&shade&&shade.parentElement!==dialog)dialog.appendChild(shade);
+}
+mountPairEditorInsideDialog();
 function mergePair(target,source){
  if(!target||!source)return target;
  Object.assign(target,source);
@@ -267,11 +272,11 @@ function fillPairEditor(key){
  }
  pairPreview('pairLeftPreview',p.leftImage,'LEFT FULLBODY');pairPreview('pairRightPreview',p.rightImage,'RIGHT FULLBODY');$('#pairEditorStatus').textContent='';
 }
-function openPairEditor(key='pair01'){if(!admin)return;fillPairEditor(pairMap()[key]?key:'pair01');openShade('pairEditorShade')}
+function openPairEditor(key='pair01'){if(!admin)return;mountPairEditorInsideDialog();if(typeof closeProfileSheets==='function')closeProfileSheets();fillPairEditor(pairMap()[key]?key:'pair01');openShade('pairEditorShade');setTimeout(()=>{const p=$('#pairEditorShade .pair-editor-paper');if(p)p.scrollTop=0},0)}
 function collectSide(prefix){return {name:$('#'+prefix+'Name').value.trim(),quote:$('#'+prefix+'Quote').value.trim(),catchphrase:$('#'+prefix+'Catch').value.trim(),gender:$('#'+prefix+'Gender').value.trim(),height:$('#'+prefix+'Height').value.trim(),age:$('#'+prefix+'Age').value.trim(),race:$('#'+prefix+'Race').value.trim(),realm:$('#'+prefix+'Realm').value.trim(),rows:[{label:'외형',value:$('#'+prefix+'Appearance').value},{label:'성격',value:$('#'+prefix+'Personality').value},{label:'능력',value:$('#'+prefix+'Ability').value},{label:'천명 또는 목표',value:$('#'+prefix+'Destiny').value},{label:'중요한 인연',value:$('#'+prefix+'Relation').value},{label:'기타',value:$('#'+prefix+'Other').value}]}}
 async function savePairProfile(){
  if(!admin)return;const key=$('#pairEditorKey').value;const payload={title:$('#pairTitleInput').value.trim()||key.toUpperCase(),subtitle:$('#pairSubtitleInput').value.trim(),previewImage:$('#pairPreviewInput').value.trim(),leftImage:$('#pairLeftImage').value.trim(),rightImage:$('#pairRightImage').value.trim(),left:collectSide('pairLeft'),right:collectSide('pairRight'),editorName:$('#cmsEditorName')?.value.trim()||'',authorUid:currentUser.uid,updatedAt:serverTimestamp()};
- try{await setDoc(doc(db,'characterPairs',key),payload,{merge:true});mergePair(pairMap()[key],payload);refreshPairCards();$('#pairEditorStatus').textContent='저장됨';const dialog=$('#pairDialog');if(dialog?.open&&dialog.dataset.activePair===key&&window.CHEONSANGHEUN_OPEN_PAIR){dialog.close();setTimeout(()=>window.CHEONSANGHEUN_OPEN_PAIR(key),30)}}catch(e){console.error('pair save failed',e);$('#pairEditorStatus').textContent=`저장 실패 · ${e?.code||e?.message||'unknown error'}`}
+ try{await setDoc(doc(db,'characterPairs',key),payload,{merge:true});mergePair(pairMap()[key],payload);refreshPairCards();$('#pairEditorStatus').textContent='저장됨 · 현재 프로필에 반영됨';const dialog=$('#pairDialog');if(dialog?.open&&dialog.dataset.activePair===key&&window.CHEONSANGHEUN_OPEN_PAIR){window.CHEONSANGHEUN_OPEN_PAIR(key,true);mountPairEditorInsideDialog();openShade('pairEditorShade')}}catch(e){console.error('pair save failed',e);$('#pairEditorStatus').textContent=`저장 실패 · ${e?.code||e?.message||'unknown error'}`}
 }
 $('#characterPairManager')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
 $('#pairProfileEditBtn')?.addEventListener('click',()=>openPairEditor($('#pairDialog')?.dataset.activePair||'pair01'));
